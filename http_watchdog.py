@@ -1,15 +1,18 @@
 import re
 import time
 import http.client
+import logging
 from contextlib   import closing
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 class HttpWatchdog:
     def __init__(self, probe_interval, page_configs):
         self.probe_interval = probe_interval
         self.page_configs   = []
 
-        print("Probe interval: {} seconds".format(self.probe_interval))
+        logger.debug("Probing interval: %d seconds", self.probe_interval)
 
         for page_config in page_configs:
             (host, port, path_and_query) = self._split_url(page_config['url'])
@@ -20,8 +23,10 @@ class HttpWatchdog:
                 'path':  path_and_query,
                 'regex': re.compile(page_config['pattern'])
             })
+            logger.debug("Probe URL: %s", self._join_url(host, port, path_and_query))
+            logger.debug("Probe pattern: %s", page_config['pattern'])
 
-            print("Watching url: {}".format(self._join_url(host, port, path_and_query)))
+        logger.debug("Watchdog initialized\n")
 
     @classmethod
     def _split_url(cls, url):
@@ -79,7 +84,12 @@ class HttpWatchdog:
                     }
 
     def run_forever(self):
+        logger.info("Starting HTTP watchdog in an infinite loop. Use Ctrl+C to stop.\n")
+
+        probe_index = 0
         while True:
+            logger.debug("Starting probe %d", probe_index + 1)
+
             total_http_time = 0
             for (i, result) in enumerate(self.probe()):
                 url = self._join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
@@ -91,14 +101,44 @@ class HttpWatchdog:
                 else:
                     status_string = result['result']
 
-                print("{}: {} ({:0.0f} ms)".format(url, status_string, result['time'] * 1000))
+                logger.info("%s: %s (%0.0f ms)", url, status_string, result['time'] * 1000)
 
                 total_http_time += result['time']
 
-            print("Probe finished. Total HTTP time: {:0.3f} s\n".format(total_http_time))
+            logger.info("Probe %d finished. Total HTTP time: %0.3f s\n", probe_index + 1, total_http_time)
+
+            probe_index += 1
             time.sleep(self.probe_interval)
 
+def configure_console_logging(level):
+    root_logger = logging.getLogger()
+
+    formatter = logging.Formatter('%(message)s')
+
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+
+    root_logger.addHandler(handler)
+
+def configure_file_logging(level, log_path):
+    root_logger = logging.getLogger()
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    handler = logging.FileHandler(log_path)
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+
+    root_logger.addHandler(handler)
+
 if __name__ == '__main__':
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    configure_console_logging(logging.INFO)
+    configure_file_logging(logging.DEBUG, 'http_watchdog.log')
+
     watchdog = HttpWatchdog(10, [
         {
             'url':     'http://www.google.pl',

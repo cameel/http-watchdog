@@ -7,3 +7,6 @@
 __pycache__
 *.pyc
 *.pyo
+
+# Log file
+/http_watchdog.log
