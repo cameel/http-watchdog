@@ -1,0 +1,9 @@
+# Vim's temporary files
+*.swp
+*.swo
+*.swn
+
+# Python's compiled bytecode
+__pycache__
+*.pyc
+*.pyo
