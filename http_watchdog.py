@@ -50,8 +50,16 @@ class HttpWatchdog:
     def probe(self):
         for page_config in self.page_configs:
             with closing(http.client.HTTPConnection(page_config['host'], page_config['port'])) as connection:
+                # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
+                # NOTE: getresponse() probably performs the whole operation of receiving the data from
+                # the server rather than just passing the data already received by the OS and for that
+                # reason it's also included in timing.
+                start_time = time.time()
+
                 connection.request("GET", page_config['path'])
                 response = connection.getresponse()
+
+                end_time = time.time()
 
                 if response.status == http.client.OK:
                     # FIXME: What if the content is a binary file?
@@ -59,27 +67,35 @@ class HttpWatchdog:
                     pattern_found = (page_config['regex'].search(page_content) != None)
 
                     yield {
-                        'result': 'PATTERN FOUND' if pattern_found else 'PATTERN NOT FOUND'
+                        'result': 'PATTERN FOUND' if pattern_found else 'PATTERN NOT FOUND',
+                        'time':   end_time - start_time
                     }
                 else:
                     yield {
                         'result':      'HTTP ERROR',
                         'http_status': response.status,
-                        'http_reason': response.reason
+                        'http_reason': response.reason,
+                        'time':        end_time - start_time
                     }
 
     def run_forever(self):
         while True:
+            total_http_time = 0
             for (i, result) in enumerate(self.probe()):
                 url = self._join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
 
                 assert result['result'] in ['PATTERN FOUND', 'PATTERN NOT FOUND', 'HTTP ERROR']
 
                 if result['result'] == 'HTTP ERROR':
-                    print("{}: {} {} {}".format(url, result['result'], result['http_status'], result['http_reason']))
+                    status_string = "{result} {http_status} {http_reason}".format(**result)
                 else:
-                    print("{}: {}".format(url, result['result']))
+                    status_string = result['result']
 
+                print("{}: {} ({:0.0f} ms)".format(url, status_string, result['time'] * 1000))
+
+                total_http_time += result['time']
+
+            print("Probe finished. Total HTTP time: {:0.3f} s\n".format(total_http_time))
             time.sleep(self.probe_interval)
 
 if __name__ == '__main__':
