@@ -1,8 +1,29 @@
 probe-interval: 10
 pages:
   - url: http://www.google.pl
-    pattern: \<\/html\>
+    patterns:
+      - \<body\>
+      - \<p\>
+      - \<\/html\>
   - url: http://en.wikipedia.org/wiki/Python_(programming_language)
-    pattern: spam
+    patterns:
+      - spam
+      - eggs
+  - url: http://en.wikipedia.org/wiki/Python_(programming_language)
+    patterns:
+      # This page does not contain all these patterns
+      - ham
+      - spam
+      - eggs
+      - hammers
   - url: http://en.wikipedia.org/null
-    pattern: test
+    # Should result in 404 error
+    patterns:
+      - test
+  - url: http://en.wikipedia.org
+    # Should result in 301 redirect
+    patterns:
+      - test
+  - url: http://sv.wikipedia.org/wiki/Portal:Huvudsida
+    # An empty list of patterns
+    patterns: []

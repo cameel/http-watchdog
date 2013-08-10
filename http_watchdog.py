@@ -20,13 +20,13 @@ class HttpWatchdog:
             (host, port, path_and_query) = self._split_url(page_config['url'])
 
             self.page_configs.append({
-                'host':  host,
-                'port':  port,
-                'path':  path_and_query,
-                'regex': re.compile(page_config['pattern'])
+                'host':    host,
+                'port':    port,
+                'path':    path_and_query,
+                'regexes': [re.compile(pattern) for pattern in page_config['patterns']]
             })
             logger.debug("Probe URL: %s", self._join_url(host, port, path_and_query))
-            logger.debug("Probe pattern: %s", page_config['pattern'])
+            logger.debug("Probe patterns: %s", ' AND '.join(page_config['patterns']))
 
         logger.debug("Watchdog initialized\n")
 
@@ -56,6 +56,8 @@ class HttpWatchdog:
 
     def probe(self):
         for page_config in self.page_configs:
+            logger.debug("Probing %s", self._join_url(page_config['host'], page_config['port'], page_config['path']))
+
             with closing(http.client.HTTPConnection(page_config['host'], page_config['port'])) as connection:
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
                 # NOTE: getresponse() probably performs the whole operation of receiving the data from
@@ -71,10 +73,18 @@ class HttpWatchdog:
                 if response.status == http.client.OK:
                     # FIXME: What if the content is a binary file?
                     page_content  = str(response.read())
-                    pattern_found = (page_config['regex'].search(page_content) != None)
+                    pattern_found = True
+                    for regex in page_config['regexes']:
+                        match = regex.search(page_content)
+                        pattern_found &= (match != None)
+
+                        logger.debug("Pattern '%s': %s", regex.pattern, ("match at {}".format(match.start()) if pattern_found else "no match"))
+
+                        if not pattern_found:
+                            break
 
                     yield {
-                        'result': 'PATTERN FOUND' if pattern_found else 'PATTERN NOT FOUND',
+                        'result': 'MATCH' if pattern_found else 'NO MATCH',
                         'time':   end_time - start_time
                     }
                 else:
@@ -96,7 +106,7 @@ class HttpWatchdog:
             for (i, result) in enumerate(self.probe()):
                 url = self._join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
 
-                assert result['result'] in ['PATTERN FOUND', 'PATTERN NOT FOUND', 'HTTP ERROR']
+                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
                 if result['result'] == 'HTTP ERROR':
                     status_string = "{result} {http_status} {http_reason}".format(**result)
