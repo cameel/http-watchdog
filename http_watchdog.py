@@ -2,6 +2,7 @@ import re
 import time
 import http.client
 import logging
+import yaml
 from contextlib   import closing
 from urllib.parse import urlparse
 
@@ -139,19 +140,16 @@ if __name__ == '__main__':
     configure_console_logging(logging.INFO)
     configure_file_logging(logging.DEBUG, 'http_watchdog.log')
 
-    watchdog = HttpWatchdog(10, [
-        {
-            'url':     'http://www.google.pl',
-            'pattern': r'\<\/html\>'
-        },
-        {
-            'url':     'http://en.wikipedia.org/wiki/Python_(programming_language)',
-            'pattern': r'spam'
-        },
-        {
-            'url':     'https://en.wikipedia.org/null',
-            'pattern': r'test'
-        }
-    ])
+    with open('pages.yaml') as requirement_file:
+        # TODO: Validate config file with a schema
+        requirements = yaml.load(requirement_file)
+
+    if not 'pages' in requirements:
+        # FIXME: Use specific exception type
+        raise Exception("'pages' key missing from requirement file")
+
+    page_configs = requirements['pages']
+
+    watchdog = HttpWatchdog(10, page_configs)
 
     watchdog.run_forever()

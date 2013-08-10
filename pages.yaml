@@ -1,0 +1,7 @@
+pages:
+  - url: http://www.google.pl
+    pattern: \<\/html\>
+  - url: http://en.wikipedia.org/wiki/Python_(programming_language)
+    pattern: spam
+  - url: http://en.wikipedia.org/null
+    pattern: test
