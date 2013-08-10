@@ -1,3 +1,4 @@
+probe-interval: 10
 pages:
   - url: http://www.google.pl
     pattern: \<\/html\>

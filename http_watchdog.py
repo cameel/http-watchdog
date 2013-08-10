@@ -148,8 +148,14 @@ if __name__ == '__main__':
         # FIXME: Use specific exception type
         raise Exception("'pages' key missing from requirement file")
 
+    if 'probe-interval' in requirements:
+        # FIXME: Make sure it's really an integer
+        probe_interval = requirements['probe-interval']
+    else:
+        probe_interval = 10
+
     page_configs = requirements['pages']
 
-    watchdog = HttpWatchdog(10, page_configs)
+    watchdog = HttpWatchdog(probe_interval, page_configs)
 
     watchdog.run_forever()
