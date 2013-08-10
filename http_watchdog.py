@@ -3,6 +3,7 @@ import time
 import http.client
 import logging
 import yaml
+from argparse     import ArgumentParser
 from contextlib   import closing
 from urllib.parse import urlparse
 
@@ -133,6 +134,22 @@ def configure_file_logging(level, log_path):
 
     root_logger.addHandler(handler)
 
+def parse_command_line():
+    parser = ArgumentParser(description = "A tool for monitoring remote documents available over HTTP.")
+    parser.add_argument('requirement_file_path',
+        help    = "The file that lists the URL to be monitored and their requirements",
+        action  = 'store',
+        type    = str
+    )
+    parser.add_argument('--probe-interval',
+        help    = "The time to wait between subsequent probes",
+        dest    = 'probe_interval',
+        action  = 'store',
+        type    = int
+    )
+
+    return parser.parse_args()
+
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
@@ -140,7 +157,9 @@ if __name__ == '__main__':
     configure_console_logging(logging.INFO)
     configure_file_logging(logging.DEBUG, 'http_watchdog.log')
 
-    with open('pages.yaml') as requirement_file:
+    command_line_namespace = parse_command_line()
+
+    with open(command_line_namespace.requirement_file_path) as requirement_file:
         # TODO: Validate config file with a schema
         requirements = yaml.load(requirement_file)
 
@@ -148,8 +167,10 @@ if __name__ == '__main__':
         # FIXME: Use specific exception type
         raise Exception("'pages' key missing from requirement file")
 
-    if 'probe-interval' in requirements:
-        # FIXME: Make sure it's really an integer
+    # FIXME: Make sure it's really an integer
+    if command_line_namespace.probe_interval != None:
+        probe_interval = command_line_namespace.probe_interval
+    elif 'probe-interval' in requirements:
         probe_interval = requirements['probe-interval']
     else:
         probe_interval = 10
