@@ -66,3 +66,6 @@ pages:
     # URL with IDN (without redirect)
     patterns:
       - 首页
+  - url: http://www.xkcd.jam
+    patterns:
+      - 首页

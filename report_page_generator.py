@@ -30,10 +30,10 @@ class ReportPageGenerator:
         table_body = ""
         for (result, config) in zip(probe_results, page_configs):
             if result != None:
-                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
+                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR', 'CONNECTION ERROR']
 
                 status              = result['result']
-                http_status         = str(result['http_status']) + ' ' + result['http_reason']
+                http_status         = (str(result['http_status']) if result['http_status'] != None else '') + ' ' + result['reason']
                 request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000)
                 seconds_since_probe = '{} seconds ago'.format(round((datetime.utcnow() - result['last_probed_at']).total_seconds()))
                 last_probed_at      = str(result['last_probed_at']) + " UTC"

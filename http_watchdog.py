@@ -102,49 +102,70 @@ class HttpWatchdog:
             connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
 
             with closing(connection_class(host, port)) as connection:
+                logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
+
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
                 # NOTE: getresponse() probably performs the whole operation of receiving the data from
                 # the server rather than just passing the data already received by the OS and for that
                 # reason it's also included in timing.
                 start_time = time.time()
 
-                logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
-                connection.request("GET", path_and_query)
-                response = connection.getresponse()
+                result = None
+                try:
+                    connection.request("GET", path_and_query)
+                    response = connection.getresponse()
+                except (AssertionError, TypeError, SyntaxError, ValueError):
+                    # We're only interested in connection-related failures. There's no easy and future-proof way to
+                    # discern them from exceptions caused by programmer's mistakes but we can at least make our life
+                    # easier by excluding some common ones.
+                    raise
+                except Exception as exception:
+                    # All other non-base exceptions should be caught and presented to the user. They're silenced but still
+                    # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
+                    # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
+                    # late than let the program crash here if the network goes down for a while.
+                    logger.exception("A GET request has been interrupted by an exception")
+
+                    result      = 'CONNECTION ERROR'
+                    reason      = str(exception)
+                    http_status = None
 
                 end_time = time.time()
 
-                if response.status == http.client.OK:
-                    # FIXME: What if the content is a binary file?
-                    content_type     = response.getheader('Content-Type')
-                    response_charset = self._detect_response_charset(content_type)
-                    logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
+                if result == None:
+                    if response.status == http.client.OK:
+                        # FIXME: What if the content is a binary file?
+                        content_type     = response.getheader('Content-Type')
+                        response_charset = self._detect_response_charset(content_type)
+                        logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
 
-                    page_content = response.read().decode(response_charset or 'utf-8')
+                        page_content = response.read().decode(response_charset or 'utf-8')
 
-                    pattern_found = True
-                    for regex in page_config['regexes']:
-                        match = regex.search(page_content)
-                        pattern_found &= (match != None)
+                        pattern_found = True
+                        for regex in page_config['regexes']:
+                            match = regex.search(page_content)
+                            pattern_found &= (match != None)
 
+                            if not pattern_found:
+                                logger.debug("Pattern '%s': no match", regex.pattern)
+                                break
+                            else:
+                                logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
 
-                        if not pattern_found:
-                            logger.debug("Pattern '%s': no match", regex.pattern)
-                            break
-                        else:
-                            logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
+                        result = 'MATCH' if pattern_found else 'NO MATCH'
+                    else:
+                        result = 'HTTP ERROR'
 
-                    result = 'MATCH' if pattern_found else 'NO MATCH'
-                else:
-                    result = 'HTTP ERROR'
+                    reason      = response.reason
+                    http_status = response.status
 
-                yield {
-                    'result':           result,
-                    'http_status':      response.status,
-                    'http_reason':      response.reason,
-                    'last_probed_at':   datetime.utcnow(),
-                    'request_duration': end_time - start_time
-                }
+            yield {
+                'result':           result,
+                'http_status':      http_status,
+                'reason':           reason,
+                'last_probed_at':   datetime.utcnow(),
+                'request_duration': end_time - start_time
+            }
 
     def get_probe_results(self):
         return self.probe_results
@@ -172,11 +193,11 @@ class HttpWatchdog:
 
                 self.probe_results[i] = result
 
-                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
+                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR', 'CONNECTION ERROR']
 
                 # By default inform only about the failures
                 level = logging.INFO if result['result'] != 'MATCH' else logging.DEBUG
-                status_string = "{result} {http_status} {http_reason}".format(**result)
+                status_string = "{result} {http_status} {reason}".format(**result)
 
                 logger.log(level, "%s: %s (%0.0f ms)", self.page_configs[i]['url'], status_string, result['request_duration'] * 1000)
 

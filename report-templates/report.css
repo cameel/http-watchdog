@@ -8,7 +8,7 @@ td.no-match {
     background-color: yellow;
 }
 
-td.http-error {
+td.http-error, td.connection-error {
     color:            white;
     background-color: red;
 }
