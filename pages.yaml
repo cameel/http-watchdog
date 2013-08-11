@@ -2,9 +2,16 @@ probe-interval: 10
 pages:
   - url: http://www.google.pl
     patterns:
-      - \<body\>
-      - \<p\>
-      - \<\/html\>
+      # Regex with special characters
+      - <body
+      - </html>
+      - '"csi"'
+      - window\._\._
+  - url: http://www.google.pl
+    patterns:
+      # More complex regex
+      - '#\d\d\d'
+      - 'function\(\)\{.*\}'
   - url: http://en.wikipedia.org/wiki/Python_(programming_language)
     patterns:
       - spam

@@ -124,10 +124,12 @@ class HttpWatchdog:
                         match = regex.search(page_content)
                         pattern_found &= (match != None)
 
-                        logger.debug("Pattern '%s': %s", regex.pattern, ("match at {}".format(match.start()) if pattern_found else "no match"))
 
                         if not pattern_found:
+                            logger.debug("Pattern '%s': no match", regex.pattern)
                             break
+                        else:
+                            logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
 
                     result = 'MATCH' if pattern_found else 'NO MATCH'
                 else:
