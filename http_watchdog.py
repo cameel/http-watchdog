@@ -18,7 +18,8 @@ DEFAULT_PORT           = 80
 
 logger = logging.getLogger(__name__)
 
-class ConfigurationError(Exception): pass
+class ConfigurationError(Exception):    pass
+class CharsetDetectionError(Exception): pass
 
 class HttpWatchdog:
     DEFAULT_PORTS = {
@@ -63,6 +64,29 @@ class HttpWatchdog:
 
         return (host, port, path_and_query)
 
+    @classmethod
+    def _detect_response_charset(cls, content_type):
+        if content_type == None:
+            return None
+
+        # FIXME: Are escaped semicolons or equals signs possible here?
+        fields = content_type.split(';')
+        result = None
+        for field in fields:
+            tokens = field.split('=')
+
+            # I'm not sure if 'charset' supposed to be case-sensitive or not but it's highly unlikely that
+            # there are multiple valid possibilities differing only with case and taking into account the current
+            # tangled mess of server implementations it's better to accept any case.
+            if len(tokens) == 2 and tokens[0].strip().lower() == 'charset':
+                if result != None:
+                    # TODO: Say which url this message pertains to
+                    raise CharsetDetectionError("Found multiple charset fields in the Content-Type header: {}".format(content_type))
+
+                return tokens[1].strip()
+
+        return None
+
     def probe(self):
         for page_config in self.page_configs:
             logger.debug("Probing %s", page_config['url'])
@@ -89,7 +113,12 @@ class HttpWatchdog:
 
                 if response.status == http.client.OK:
                     # FIXME: What if the content is a binary file?
-                    page_content  = str(response.read())
+                    content_type     = response.getheader('Content-Type')
+                    response_charset = self._detect_response_charset(content_type)
+                    logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
+
+                    page_content = response.read().decode(response_charset or 'utf-8')
+
                     pattern_found = True
                     for regex in page_config['regexes']:
                         match = regex.search(page_content)
