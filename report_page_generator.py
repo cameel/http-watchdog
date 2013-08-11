@@ -35,11 +35,13 @@ class ReportPageGenerator:
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
                 status              = result['result']
+                http_status         = str(result['http_status']) + ' ' + result['http_reason']
                 request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000)
                 seconds_since_probe = '{} seconds ago'.format(round((datetime.utcnow() - result['last_probed_at']).total_seconds()))
                 last_probed_at      = str(result['last_probed_at']) + " UTC"
             else:
                 status              = 'NOT PROBED YET'
+                http_status         = ''
                 request_duration    = ''
                 seconds_since_probe = ''
                 last_probed_at      = 'NOT PROBED YET'
@@ -48,6 +50,7 @@ class ReportPageGenerator:
                 "<tr>\n"
                 "   <td><a href='http://{url}'>{url}</a></td>\n"
                 "   <td class='{status_class}'>{status}</td>\n"
+                "   <td>{http_status}</td>\n"
                 "   <td>{request_duration}</td>\n"
                 "   <td title='{last_probed_at}'>{seconds_since_probe}</td>\n"
                 "</tr>\n"
@@ -55,6 +58,7 @@ class ReportPageGenerator:
                 url                 = join_url(config['host'], config['port'], config['path']),
                 status              = status,
                 status_class        = status.lower().replace(' ', '-'),
+                http_status         = http_status,
                 request_duration    = request_duration,
                 last_probed_at      = last_probed_at,
                 seconds_since_probe = seconds_since_probe
