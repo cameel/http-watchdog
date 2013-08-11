@@ -1,0 +1,19 @@
+td.match {
+    color:            black;
+    background-color: lime;
+}
+
+td.no-match {
+    color:            black;
+    background-color: yellow;
+}
+
+td.http-error {
+    color:            white;
+    background-color: red;
+}
+
+td.not-probed-yet {
+    color:            white;
+    background-color: gray;
+}

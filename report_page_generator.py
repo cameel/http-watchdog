@@ -25,11 +25,19 @@ class ReportPageGenerator:
         with open(os.path.join(cls.REPORT_DIR, 'report.html')) as page_template_file:
             page_template = page_template_file.read()
 
+        with open(os.path.join(cls.REPORT_DIR, 'report.css')) as style_file:
+            style = style_file.read()
+
         table_body = ""
         for (result, config) in zip(probe_results, page_configs):
-            assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
-            status = result['result'] if result != None else 'NOT PROBED YET'
-            status_class = status.lower().replace(' ', '-')
+            if result != None:
+                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
+
+                status = result['result']
+                time   = result['time'] * 1000
+            else:
+                status = 'NOT PROBED YET'
+                time   = ''
 
             table_body += (
                 "<tr>\n"
@@ -38,12 +46,17 @@ class ReportPageGenerator:
                 "   <td>{time:0.0f} ms</td>\n"
                 "</tr>\n"
             ).format(
-                url    = join_url(config['host'], config['port'], config['path']),
-                status = result['result']       if result != None else 'NOT CHECKED YET',
-                time   = result['time'] * 1000  if result != None else ''
+                url           = join_url(config['host'], config['port'], config['path']),
+                status        = status,
+                status_class  = status.lower().replace(' ', '-'),
+                time          = time
             )
 
-        return cls.page_with_layout("HTTP watchdog report", page_template.format(table_body = table_body))
+        return cls.page_with_layout(
+            "HTTP watchdog report",
+            page_template.format(table_body = table_body),
+            style
+        )
 
     @classmethod
     def generate_error_404_page(cls, report_page_path):
