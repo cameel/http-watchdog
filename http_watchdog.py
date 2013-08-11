@@ -200,7 +200,7 @@ class HttpWatchdog:
                 level = logging.INFO if result['result'] != ProbeResult.MATCH else logging.DEBUG
                 status_string = "{} {} {}".format(
                     ProbeResult.to_str(result['result']),
-                    result['http_status'],
+                    result['http_status'] if result['http_status'] != None else '',
                     result['reason']
                 )
 
