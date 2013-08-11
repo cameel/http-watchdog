@@ -9,7 +9,7 @@ from datetime     import datetime
 from argparse     import ArgumentParser
 from contextlib   import closing
 from queue        import Queue
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote as urllib_quote
 
 from report_server import ReportServer
 
@@ -80,7 +80,9 @@ class HttpWatchdog:
                 # reason it's also included in timing.
                 start_time = time.time()
 
-                connection.request("GET", path_and_query)
+                encoded_path = urllib_quote(path_and_query)
+                logger.debug("GET %s from %s://%s:%d", encoded_path, parsed_url.scheme, host, port)
+                connection.request("GET", encoded_path)
                 response = connection.getresponse()
 
                 end_time = time.time()

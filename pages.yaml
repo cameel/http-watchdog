@@ -31,3 +31,15 @@ pages:
     # HTTPS example
     patterns:
       - Nagoya
+  - url: http://sv.wikipedia.org/wiki/Leoš_Janáček
+    # UTF-8 example
+    patterns:
+      - Leoš Janáček
+      - Sånger
+      - Körmusik
+      - Källor
+  - url: http://it.wikipedia.org/wiki/Isole_Fær_Øer
+    # Another UTF-8 example
+    patterns:
+      - Borðoy
+      - Færøerne
