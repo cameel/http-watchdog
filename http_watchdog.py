@@ -139,6 +139,31 @@ def parse_command_line():
 
     return parser.parse_args()
 
+def read_settings():
+    command_line_namespace = parse_command_line()
+
+    with open(command_line_namespace.requirement_file_path) as requirement_file:
+        # TODO: Validate config file with a schema
+        requirements = yaml.load(requirement_file)
+
+    settings = {}
+
+    if not 'pages' in requirements:
+        # FIXME: Use specific exception type
+        raise Exception("'pages' key missing from requirement file")
+
+    settings['pages'] = requirements['pages']
+
+    # FIXME: Make sure it's really an integer
+    if command_line_namespace.probe_interval != None:
+        settings['probe_interval'] = command_line_namespace.probe_interval
+    elif 'probe-interval' in requirements:
+        settings['probe_interval'] = requirements['probe-interval']
+    else:
+        settings['probe_interval'] = DEFAULT_PROBE_INTERVAL
+
+    return settings
+
 if __name__ == '__main__':
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
@@ -146,26 +171,8 @@ if __name__ == '__main__':
     configure_console_logging(logging.INFO)
     configure_file_logging(logging.DEBUG, 'http_watchdog.log')
 
-    command_line_namespace = parse_command_line()
+    settings = read_settings()
 
-    with open(command_line_namespace.requirement_file_path) as requirement_file:
-        # TODO: Validate config file with a schema
-        requirements = yaml.load(requirement_file)
-
-    if not 'pages' in requirements:
-        # FIXME: Use specific exception type
-        raise Exception("'pages' key missing from requirement file")
-
-    # FIXME: Make sure it's really an integer
-    if command_line_namespace.probe_interval != None:
-        probe_interval = command_line_namespace.probe_interval
-    elif 'probe-interval' in requirements:
-        probe_interval = requirements['probe-interval']
-    else:
-        probe_interval = DEFAULT_PROBE_INTERVAL
-
-    page_configs = requirements['pages']
-
-    watchdog = HttpWatchdog(probe_interval, page_configs)
+    watchdog = HttpWatchdog(settings['probe_interval'], settings['pages'])
 
     watchdog.run_forever()
