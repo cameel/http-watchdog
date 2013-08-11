@@ -1,4 +1,5 @@
 import sys
+import errno
 import re
 import time
 import http.client
@@ -219,6 +220,11 @@ if __name__ == '__main__':
 
     try:
         watchdog.run_forever(exception_queue)
+    except OSError as exception:
+        if exception.errno == errno.EADDRINUSE:
+            logger.error("ERROR: Port %d is in use by a different server or is still in TIME_WAIT state after previous use. Please select a different one or wait a while.", settings['port'])
+        else:
+            raise
     except KeyboardInterrupt:
         logger.info("Caught KeyboardInterrupt. Exiting.")
 
