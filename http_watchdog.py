@@ -3,9 +3,11 @@ import time
 import http.client
 import logging
 import yaml
-from argparse     import ArgumentParser
-from contextlib   import closing
-from urllib.parse import urlparse
+from argparse   import ArgumentParser
+from contextlib import closing
+
+from url_utils     import split_url, join_url
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class HttpWatchdog:
         logger.debug("Probing interval: %d seconds", self.probe_interval)
 
         for page_config in page_configs:
-            (host, port, path_and_query) = self._split_url(page_config['url'])
+            (host, port, path_and_query) = split_url(page_config['url'])
 
             self.page_configs.append({
                 'host':    host,
@@ -25,38 +27,14 @@ class HttpWatchdog:
                 'path':    path_and_query,
                 'regexes': [re.compile(pattern) for pattern in page_config['patterns']]
             })
-            logger.debug("Probe URL: %s", self._join_url(host, port, path_and_query))
+            logger.debug("Probe URL: %s", join_url(host, port, path_and_query))
             logger.debug("Probe patterns: %s", ' AND '.join(page_config['patterns']))
 
         logger.debug("Watchdog initialized\n")
 
-    @classmethod
-    def _split_url(cls, url):
-        parsed_url = urlparse(url)
-
-        # FIXME: Don't ignore protocol
-        # FIXME: Don't discard username and password
-        if not ':' in parsed_url.netloc:
-            host = parsed_url.netloc
-            port = ''
-        else:
-            host, port = parsed_url.netloc.split(':')
-
-        port = int(port) if port != '' else 80
-
-        # The fragment part (after #) can be discarded. It's only relevant to a client.
-        path           = parsed_url.path if parsed_url.path != '' else '/'
-        path_and_query = path + ('?' + parsed_url.query if parsed_url.query != '' else '')
-
-        return (host, port, path_and_query)
-
-    @classmethod
-    def _join_url(cls, host, port, path_and_query):
-        return host + (':' + str(port) if port != 80 else '') + path_and_query
-
     def probe(self):
         for page_config in self.page_configs:
-            logger.debug("Probing %s", self._join_url(page_config['host'], page_config['port'], page_config['path']))
+            logger.debug("Probing %s", join_url(page_config['host'], page_config['port'], page_config['path']))
 
             with closing(http.client.HTTPConnection(page_config['host'], page_config['port'])) as connection:
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
@@ -104,7 +82,7 @@ class HttpWatchdog:
 
             total_http_time = 0
             for (i, result) in enumerate(self.probe()):
-                url = self._join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
+                url = join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
 
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
