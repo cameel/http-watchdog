@@ -112,9 +112,11 @@ class HttpWatchdog:
 
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
+                # By default inform only about the failures
+                level = logging.INFO if result['result'] != 'MATCH' else logging.DEBUG
                 status_string = "{result} {http_status} {http_reason}".format(**result)
 
-                logger.info("%s: %s (%0.0f ms)", url, status_string, result['request_duration'] * 1000)
+                logger.log(level, "%s: %s (%0.0f ms)", url, status_string, result['request_duration'] * 1000)
 
                 total_http_time += result['request_duration']
 
