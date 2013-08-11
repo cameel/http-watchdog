@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from url_utils import split_url, join_url
 
@@ -33,23 +34,30 @@ class ReportPageGenerator:
             if result != None:
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
-                status = result['result']
-                time   = result['time'] * 1000
+                status              = result['result']
+                request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000)
+                seconds_since_probe = '{} seconds ago'.format(round((datetime.utcnow() - result['last_probed_at']).total_seconds()))
+                last_probed_at      = str(result['last_probed_at']) + " UTC"
             else:
-                status = 'NOT PROBED YET'
-                time   = ''
+                status              = 'NOT PROBED YET'
+                request_duration    = ''
+                seconds_since_probe = ''
+                last_probed_at      = 'NOT PROBED YET'
 
             table_body += (
                 "<tr>\n"
                 "   <td><a href='http://{url}'>{url}</a></td>\n"
                 "   <td class='{status_class}'>{status}</td>\n"
-                "   <td>{time:0.0f} ms</td>\n"
+                "   <td>{request_duration}</td>\n"
+                "   <td title='{last_probed_at}'>{seconds_since_probe}</td>\n"
                 "</tr>\n"
             ).format(
-                url           = join_url(config['host'], config['port'], config['path']),
-                status        = status,
-                status_class  = status.lower().replace(' ', '-'),
-                time          = time
+                url                 = join_url(config['host'], config['port'], config['path']),
+                status              = status,
+                status_class        = status.lower().replace(' ', '-'),
+                request_duration    = request_duration,
+                last_probed_at      = last_probed_at,
+                seconds_since_probe = seconds_since_probe
             )
 
         return cls.page_with_layout(

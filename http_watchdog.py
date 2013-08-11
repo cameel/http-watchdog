@@ -3,6 +3,7 @@ import time
 import http.client
 import logging
 import yaml
+from datetime   import datetime
 from argparse   import ArgumentParser
 from contextlib import closing
 
@@ -67,15 +68,17 @@ class HttpWatchdog:
                             break
 
                     yield {
-                        'result': 'MATCH' if pattern_found else 'NO MATCH',
-                        'time':   end_time - start_time
+                        'result':           'MATCH' if pattern_found else 'NO MATCH',
+                        'last_probed_at':   datetime.utcnow(),
+                        'request_duration': end_time - start_time
                     }
                 else:
                     yield {
-                        'result':      'HTTP ERROR',
-                        'http_status': response.status,
-                        'http_reason': response.reason,
-                        'time':        end_time - start_time
+                        'result':           'HTTP ERROR',
+                        'http_status':      response.status,
+                        'http_reason':      response.reason,
+                        'last_probed_at':   datetime.utcnow(),
+                        'request_duration': end_time - start_time
                     }
 
     def get_probe_results(self):
@@ -104,9 +107,9 @@ class HttpWatchdog:
                 else:
                     status_string = result['result']
 
-                logger.info("%s: %s (%0.0f ms)", url, status_string, result['time'] * 1000)
+                logger.info("%s: %s (%0.0f ms)", url, status_string, result['request_duration'] * 1000)
 
-                total_http_time += result['time']
+                total_http_time += result['request_duration']
 
             logger.info("Probe %d finished. Total HTTP time: %0.3f s\n", probe_index + 1, total_http_time)
 
