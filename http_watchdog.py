@@ -8,6 +8,7 @@ from contextlib import closing
 
 from url_utils     import split_url, join_url
 
+DEFAULT_PROBE_INTERVAL = 10
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ def parse_command_line():
         type    = str
     )
     parser.add_argument('--probe-interval',
-        help    = "The time to wait between subsequent probes",
+        help    = "The time to wait between subsequent probes. Default is {}".format(DEFAULT_PROBE_INTERVAL),
         dest    = 'probe_interval',
         action  = 'store',
         type    = int
@@ -161,7 +162,7 @@ if __name__ == '__main__':
     elif 'probe-interval' in requirements:
         probe_interval = requirements['probe-interval']
     else:
-        probe_interval = 10
+        probe_interval = DEFAULT_PROBE_INTERVAL
 
     page_configs = requirements['pages']
 
