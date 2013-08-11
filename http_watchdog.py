@@ -5,13 +5,13 @@ import time
 import http.client
 import logging
 import yaml
-from datetime   import datetime
-from argparse   import ArgumentParser
-from contextlib import closing
-from queue      import Queue
+from datetime     import datetime
+from argparse     import ArgumentParser
+from contextlib   import closing
+from queue        import Queue
+from urllib.parse import urlparse
 
 from report_server import ReportServer
-from url_utils     import split_url, join_url
 
 DEFAULT_PROBE_INTERVAL = 10
 DEFAULT_PORT           = 80
@@ -39,11 +39,31 @@ class HttpWatchdog:
 
         logger.debug("Watchdog initialized\n")
 
+    @classmethod
+    def _extract_info_from_url(cls, parsed_url):
+        # FIXME: Don't ignore protocol
+        # FIXME: Don't discard username and password
+        if not ':' in parsed_url.netloc:
+            host = parsed_url.netloc
+            port = ''
+        else:
+            host, port = parsed_url.netloc.split(':')
+
+        port = int(port) if port != '' else 80
+
+        # The fragment part (after #) can be discarded. It's only relevant to a client.
+        path           = parsed_url.path if parsed_url.path != '' else '/'
+        path_and_query = path + ('?' + parsed_url.query if parsed_url.query != '' else '')
+
+        return (host, port, path_and_query)
+
     def probe(self):
         for page_config in self.page_configs:
             logger.debug("Probing %s", page_config['url'])
 
-            (host, port, path_and_query) = split_url(page_config['url'])
+            parsed_url = urlparse(page_config['url'])
+            (host, port, path_and_query) = self._extract_info_from_url(parsed_url)
+
             with closing(http.client.HTTPConnection(host, port)) as connection:
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
                 # NOTE: getresponse() probably performs the whole operation of receiving the data from
