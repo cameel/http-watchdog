@@ -1,3 +1,4 @@
+import sys
 import re
 import time
 import http.client
@@ -201,4 +202,11 @@ if __name__ == '__main__':
     report_server = ReportServer(settings['port'], watchdog)
     report_server.start()
 
-    watchdog.run_forever()
+    try:
+        watchdog.run_forever()
+    except KeyboardInterrupt:
+        logger.info("Caught KeyboardInterrupt. Exiting.")
+
+        # Exit without error. Ctrl+C is the expected way of closing
+        # this application.
+        sys.exit(0)
