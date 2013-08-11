@@ -7,14 +7,15 @@ class ReportPageGenerator:
     BOOTSTRAP_VERSION = '2.3.2'
 
     @classmethod
-    def page_with_layout(cls, title, body):
+    def page_with_layout(cls, title, body, extra_style = ''):
         with open(os.path.join(cls.REPORT_DIR, 'layout.html')) as layout_template_file:
             layout_template = layout_template_file.read()
 
         return layout_template.format(
             title             = title,
             body              = body,
-            bootstrap_version = cls.BOOTSTRAP_VERSION
+            bootstrap_version = cls.BOOTSTRAP_VERSION,
+            style             = extra_style
         )
 
     @classmethod
