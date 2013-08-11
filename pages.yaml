@@ -27,3 +27,7 @@ pages:
   - url: http://sv.wikipedia.org/wiki/Portal:Huvudsida
     # An empty list of patterns
     patterns: []
+  - url: https://sv.wikipedia.org/wiki/Nagoya
+    # HTTPS example
+    patterns:
+      - Nagoya

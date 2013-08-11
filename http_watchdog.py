@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 class ConfigurationError(Exception): pass
 
 class HttpWatchdog:
+    DEFAULT_PORTS = {
+        'http':  80,
+        'https': 443,
+    }
+
     def __init__(self, probe_interval, page_configs):
         self.probe_interval = probe_interval
         self.page_configs   = []
@@ -41,7 +46,8 @@ class HttpWatchdog:
 
     @classmethod
     def _extract_info_from_url(cls, parsed_url):
-        # FIXME: Don't ignore protocol
+        assert parsed_url.scheme in cls.DEFAULT_PORTS.keys()
+
         # FIXME: Don't discard username and password
         if not ':' in parsed_url.netloc:
             host = parsed_url.netloc
@@ -49,7 +55,7 @@ class HttpWatchdog:
         else:
             host, port = parsed_url.netloc.split(':')
 
-        port = int(port) if port != '' else 80
+        port = int(port) if port != '' else cls.DEFAULT_PORTS[parsed_url.scheme]
 
         # The fragment part (after #) can be discarded. It's only relevant to a client.
         path           = parsed_url.path if parsed_url.path != '' else '/'
@@ -62,9 +68,12 @@ class HttpWatchdog:
             logger.debug("Probing %s", page_config['url'])
 
             parsed_url = urlparse(page_config['url'])
-            (host, port, path_and_query) = self._extract_info_from_url(parsed_url)
+            assert parsed_url.scheme in ['http', 'https'], 'Unsupported protocols should not pass through validation performed earlier'
 
-            with closing(http.client.HTTPConnection(host, port)) as connection:
+            (host, port, path_and_query) = self._extract_info_from_url(parsed_url)
+            connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
+
+            with closing(connection_class(host, port)) as connection:
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
                 # NOTE: getresponse() probably performs the whole operation of receiving the data from
                 # the server rather than just passing the data already received by the OS and for that
@@ -240,6 +249,10 @@ def read_settings():
 
         if not isinstance(page_config['url'], str):
             raise configurationerror("'url' must be a string (got {} of type {})".format(page_config['url'], type(page_config['url'])))
+
+        parsed_url = urlparse(page_config['url'])
+        if not parsed_url.scheme in ['http', 'https']:
+            raise configurationerror("Unsupported protocol: '{}'".format(parsed_url.scheme))
 
         if not isinstance(page_config['patterns'], (list, tuple)):
             raise ConfigurationError("'patterns' must be a collection (got {} of type {})".format(page_config['patterns'], type(page_config['patterns'])))
