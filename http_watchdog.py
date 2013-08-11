@@ -6,9 +6,11 @@ import yaml
 from argparse   import ArgumentParser
 from contextlib import closing
 
+from report_server import ReportServer
 from url_utils     import split_url, join_url
 
 DEFAULT_PROBE_INTERVAL = 10
+DEFAULT_PORT           = 80
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +148,12 @@ def parse_command_line():
         action  = 'store',
         type    = int
     )
+    parser.add_argument('--port',
+        help    = "Port for the report server. Default is {}".format(DEFAULT_PORT),
+        dest    = 'port',
+        action  = 'store',
+        type    = int
+    )
 
     return parser.parse_args()
 
@@ -172,6 +180,13 @@ def read_settings():
     else:
         settings['probe_interval'] = DEFAULT_PROBE_INTERVAL
 
+    if command_line_namespace.port != None:
+        settings['port'] = command_line_namespace.port
+    elif 'port' in requirements:
+        settings['port'] = requirements['port']
+    else:
+        settings['port'] = DEFAULT_PORT
+
     return settings
 
 if __name__ == '__main__':
@@ -184,5 +199,8 @@ if __name__ == '__main__':
     settings = read_settings()
 
     watchdog = HttpWatchdog(settings['probe_interval'], settings['pages'])
+
+    report_server = ReportServer(settings['port'], watchdog)
+    report_server.start()
 
     watchdog.run_forever()
