@@ -46,7 +46,7 @@ class HttpWatchdog:
         logger.debug("Watchdog initialized\n")
 
     @classmethod
-    def _extract_info_from_url(cls, parsed_url):
+    def _dissect_and_escape_url(cls, parsed_url):
         assert parsed_url.scheme in cls.DEFAULT_PORTS.keys()
 
         if not ':' in parsed_url.netloc:
@@ -61,7 +61,9 @@ class HttpWatchdog:
         path           = parsed_url.path if parsed_url.path != '' else '/'
         path_and_query = path + ('?' + parsed_url.query if parsed_url.query != '' else '')
 
-        return (host, port, path_and_query)
+        escaped_path_and_query = urllib_quote(path_and_query)
+
+        return (host, port, escaped_path_and_query)
 
     @classmethod
     def _detect_response_charset(cls, content_type):
@@ -93,7 +95,7 @@ class HttpWatchdog:
             parsed_url = urlparse(page_config['url'])
             assert parsed_url.scheme in ['http', 'https'], 'Unsupported protocols should not pass through validation performed earlier'
 
-            (host, port, path_and_query) = self._extract_info_from_url(parsed_url)
+            (host, port, path_and_query) = self._dissect_and_escape_url(parsed_url)
             connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
 
             with closing(connection_class(host, port)) as connection:
@@ -103,9 +105,8 @@ class HttpWatchdog:
                 # reason it's also included in timing.
                 start_time = time.time()
 
-                encoded_path = urllib_quote(path_and_query)
-                logger.debug("GET %s from %s://%s:%d", encoded_path, parsed_url.scheme, host, port)
-                connection.request("GET", encoded_path)
+                logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
+                connection.request("GET", path_and_query)
                 response = connection.getresponse()
 
                 end_time = time.time()
