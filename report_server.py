@@ -22,6 +22,11 @@ class ReportServer:
 
     def start(self):
         thread = Thread(target = self._main)
+
+        # Marking the tread as daemon will cause it to get killed automatically
+        # when the main process exits.
+        thread.daemon = True
+
         thread.start()
 
         return thread
