@@ -1,8 +1,6 @@
 import os
 from datetime import datetime
 
-from url_utils import split_url, join_url
-
 class ReportPageGenerator:
     REPORT_DIR        = 'report-templates'
     BOOTSTRAP_VERSION = '2.3.2'
@@ -48,14 +46,14 @@ class ReportPageGenerator:
 
             table_body += (
                 "<tr>\n"
-                "   <td><a href='http://{url}'>{url}</a></td>\n"
+                "   <td><a href='{url}'>{url}</a></td>\n"
                 "   <td class='{status_class}'>{status}</td>\n"
                 "   <td>{http_status}</td>\n"
                 "   <td>{request_duration}</td>\n"
                 "   <td title='{last_probed_at}'>{seconds_since_probe}</td>\n"
                 "</tr>\n"
             ).format(
-                url                 = join_url(config['host'], config['port'], config['path']),
+                url                 = config['url'],
                 status              = status,
                 status_class        = status.lower().replace(' ', '-'),
                 http_status         = http_status,

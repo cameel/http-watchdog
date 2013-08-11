@@ -28,15 +28,11 @@ class HttpWatchdog:
         logger.debug("Probing interval: %d seconds", self.probe_interval)
 
         for page_config in page_configs:
-            (host, port, path_and_query) = split_url(page_config['url'])
-
             self.page_configs.append({
-                'host':    host,
-                'port':    port,
-                'path':    path_and_query,
+                'url':     page_config['url'],
                 'regexes': [re.compile(pattern) for pattern in page_config['patterns']]
             })
-            logger.debug("Probe URL: %s", join_url(host, port, path_and_query))
+            logger.debug("Probe URL: %s", page_config['url'])
             logger.debug("Probe patterns: %s", ' AND '.join(page_config['patterns']))
 
         self.probe_results = [None] * len(self.page_configs)
@@ -45,16 +41,17 @@ class HttpWatchdog:
 
     def probe(self):
         for page_config in self.page_configs:
-            logger.debug("Probing %s", join_url(page_config['host'], page_config['port'], page_config['path']))
+            logger.debug("Probing %s", page_config['url'])
 
-            with closing(http.client.HTTPConnection(page_config['host'], page_config['port'])) as connection:
+            (host, port, path_and_query) = split_url(page_config['url'])
+            with closing(http.client.HTTPConnection(host, port)) as connection:
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
                 # NOTE: getresponse() probably performs the whole operation of receiving the data from
                 # the server rather than just passing the data already received by the OS and for that
                 # reason it's also included in timing.
                 start_time = time.time()
 
-                connection.request("GET", page_config['path'])
+                connection.request("GET", path_and_query)
                 response = connection.getresponse()
 
                 end_time = time.time()
@@ -108,9 +105,7 @@ class HttpWatchdog:
             for (i, result) in enumerate(self.probe()):
                 self.process_asynchronous_exceptions(exception_queue)
 
-                self.probe_results[i]  = result
-
-                url = join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
+                self.probe_results[i] = result
 
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
@@ -118,7 +113,7 @@ class HttpWatchdog:
                 level = logging.INFO if result['result'] != 'MATCH' else logging.DEBUG
                 status_string = "{result} {http_status} {http_reason}".format(**result)
 
-                logger.log(level, "%s: %s (%0.0f ms)", url, status_string, result['request_duration'] * 1000)
+                logger.log(level, "%s: %s (%0.0f ms)", self.page_configs[i]['url'], status_string, result['request_duration'] * 1000)
 
                 total_http_time += result['request_duration']
 

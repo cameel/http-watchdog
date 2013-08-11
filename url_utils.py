@@ -21,5 +21,7 @@ def split_url(url):
 
     return (host, port, path_and_query)
 
+# This method is not currently use anywhere but I left it for completeness.
+# I may be useful in the future.
 def join_url(host, port, path_and_query):
     return host + (':' + str(port) if port != 80 else '') + path_and_query
