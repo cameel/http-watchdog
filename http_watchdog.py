@@ -31,6 +31,8 @@ class HttpWatchdog:
             logger.debug("Probe URL: %s", join_url(host, port, path_and_query))
             logger.debug("Probe patterns: %s", ' AND '.join(page_config['patterns']))
 
+        self.probe_results = [None] * len(self.page_configs)
+
         logger.debug("Watchdog initialized\n")
 
     def probe(self):
@@ -74,6 +76,12 @@ class HttpWatchdog:
                         'time':        end_time - start_time
                     }
 
+    def get_probe_results(self):
+        return self.probe_results
+
+    def get_page_configs(self):
+        return self.page_configs
+
     def run_forever(self):
         logger.info("Starting HTTP watchdog in an infinite loop. Use Ctrl+C to stop.\n")
 
@@ -83,6 +91,8 @@ class HttpWatchdog:
 
             total_http_time = 0
             for (i, result) in enumerate(self.probe()):
+                self.probe_results[i]  = result
+
                 url = join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
 
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
