@@ -67,19 +67,17 @@ class HttpWatchdog:
                         if not pattern_found:
                             break
 
-                    yield {
-                        'result':           'MATCH' if pattern_found else 'NO MATCH',
-                        'last_probed_at':   datetime.utcnow(),
-                        'request_duration': end_time - start_time
-                    }
+                    result = 'MATCH' if pattern_found else 'NO MATCH'
                 else:
-                    yield {
-                        'result':           'HTTP ERROR',
-                        'http_status':      response.status,
-                        'http_reason':      response.reason,
-                        'last_probed_at':   datetime.utcnow(),
-                        'request_duration': end_time - start_time
-                    }
+                    result = 'HTTP ERROR'
+
+                yield {
+                    'result':           result,
+                    'http_status':      response.status,
+                    'http_reason':      response.reason,
+                    'last_probed_at':   datetime.utcnow(),
+                    'request_duration': end_time - start_time
+                }
 
     def get_probe_results(self):
         return self.probe_results
@@ -102,10 +100,7 @@ class HttpWatchdog:
 
                 assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
 
-                if result['result'] == 'HTTP ERROR':
-                    status_string = "{result} {http_status} {http_reason}".format(**result)
-                else:
-                    status_string = result['result']
+                status_string = "{result} {http_status} {http_reason}".format(**result)
 
                 logger.info("%s: %s (%0.0f ms)", url, status_string, result['request_duration'] * 1000)
 
