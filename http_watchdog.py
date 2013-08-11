@@ -7,6 +7,7 @@ import yaml
 from datetime   import datetime
 from argparse   import ArgumentParser
 from contextlib import closing
+from queue      import Queue
 
 from report_server import ReportServer
 from url_utils     import split_url, join_url
@@ -86,7 +87,14 @@ class HttpWatchdog:
     def get_page_configs(self):
         return self.page_configs
 
-    def run_forever(self):
+    def process_asynchronous_exceptions(self, exception_queue):
+        logger.debug("Processing exceptions from other threads ({} messages)".format(exception_queue.qsize()))
+
+        while not exception_queue.empty():
+            (exc_type, exc_obj, exc_trace) = exception_queue.get_nowait()
+            raise exc_type.with_traceback(exc_obj, exc_trace)
+
+    def run_forever(self, exception_queue):
         logger.info("Starting HTTP watchdog in an infinite loop. Use Ctrl+C to stop.\n")
 
         probe_index = 0
@@ -95,6 +103,8 @@ class HttpWatchdog:
 
             total_http_time = 0
             for (i, result) in enumerate(self.probe()):
+                self.process_asynchronous_exceptions(exception_queue)
+
                 self.probe_results[i]  = result
 
                 url = join_url(self.page_configs[i]['host'], self.page_configs[i]['port'], self.page_configs[i]['path'])
@@ -107,9 +117,13 @@ class HttpWatchdog:
 
                 total_http_time += result['request_duration']
 
-            logger.info("Probe %d finished. Total HTTP time: %0.3f s\n", probe_index + 1, total_http_time)
+            logger.debug("Probe %d finished. Total HTTP time: %0.3f s", probe_index + 1, total_http_time)
+
+            self.process_asynchronous_exceptions(exception_queue)
 
             probe_index += 1
+
+            logger.debug("Going to sleep for %d seconds\n", self.probe_interval)
             time.sleep(self.probe_interval)
 
 def configure_console_logging(level):
@@ -199,11 +213,12 @@ if __name__ == '__main__':
 
     watchdog = HttpWatchdog(settings['probe_interval'], settings['pages'])
 
-    report_server = ReportServer(settings['port'], watchdog)
+    exception_queue = Queue()
+    report_server = ReportServer(settings['port'], watchdog, exception_queue)
     report_server.start()
 
     try:
-        watchdog.run_forever()
+        watchdog.run_forever(exception_queue)
     except KeyboardInterrupt:
         logger.info("Caught KeyboardInterrupt. Exiting.")
 
