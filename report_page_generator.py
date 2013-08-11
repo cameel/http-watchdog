@@ -4,6 +4,7 @@ from url_utils import split_url, join_url
 
 class ReportPageGenerator:
     REPORT_DIR        = 'report-templates'
+    BOOTSTRAP_VERSION = '2.3.2'
 
     @classmethod
     def page_with_layout(cls, title, body):
@@ -11,8 +12,9 @@ class ReportPageGenerator:
             layout_template = layout_template_file.read()
 
         return layout_template.format(
-            title = title,
-            body  = body
+            title             = title,
+            body              = body,
+            bootstrap_version = cls.BOOTSTRAP_VERSION
         )
 
     @classmethod
