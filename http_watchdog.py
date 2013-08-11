@@ -18,6 +18,8 @@ DEFAULT_PORT           = 80
 
 logger = logging.getLogger(__name__)
 
+class ConfigurationError(Exception): pass
+
 class HttpWatchdog:
     def __init__(self, probe_interval, page_configs):
         self.probe_interval = probe_interval
@@ -173,37 +175,76 @@ def parse_command_line():
 
     return parser.parse_args()
 
+def get_optional_integer_setting(setting_name, default_value, command_line_namespace, requirements):
+    internal_setting_name = setting_name.replace('-', '_')
+
+    command_line_value = getattr(command_line_namespace, internal_setting_name)
+
+    try:
+        if command_line_value != None:
+            return int(command_line_value)
+        elif setting_name in requirements:
+            return int(requirements[setting_name])
+        else:
+            return default_value
+    except ValueError as exception:
+        raise ConfigurationError("'{}' must be a an integer".format(setting_name)) from exception
+
 def read_settings():
     command_line_namespace = parse_command_line()
 
     with open(command_line_namespace.requirement_file_path) as requirement_file:
-        # TODO: Validate config file with a schema
         requirements = yaml.load(requirement_file)
 
     settings = {}
+    warnings = []
 
     if not 'pages' in requirements:
-        # FIXME: Use specific exception type
-        raise Exception("'pages' key missing from requirement file")
+        raise ConfigurationError("'pages' key missing from requirement file")
 
     settings['pages'] = requirements['pages']
 
-    # FIXME: Make sure it's really an integer
-    if command_line_namespace.probe_interval != None:
-        settings['probe_interval'] = command_line_namespace.probe_interval
-    elif 'probe-interval' in requirements:
-        settings['probe_interval'] = requirements['probe-interval']
-    else:
-        settings['probe_interval'] = DEFAULT_PROBE_INTERVAL
+    if not isinstance(settings['pages'], (list, tuple)):
+        # The intention here is to check whether 'pages' was a YAML collection. If it was, it
+        # should get converted to list (added also tuple just in case it changes in the future).
+        # A more comprehensive check that includes list/tuple-like objects not necessarily inheriting from
+        # list or tuple, excludes string-like objects and is future-proof is hard to devise if not impossible.
+        # Let's just leave things simple - if pyyaml decides to start using a different type
+        # we'll notice it anyway because the program will stop working with existing requirement files.
+        # And no, trying to use the object and checking for TypeError is not an acceptable solution because there
+        # are too many other things that can cause TypeError that we wouldn't like silently ignored.
+        raise ConfigurationError("'pages' must be a collection (got {} of type {})".format(settings['pages'], type(settings['pages'])))
 
-    if command_line_namespace.port != None:
-        settings['port'] = command_line_namespace.port
-    elif 'port' in requirements:
-        settings['port'] = requirements['port']
-    else:
-        settings['port'] = DEFAULT_PORT
+    if len(settings['pages']) == 0:
+        raise ConfigurationError("No page configurations specified.")
 
-    return settings
+    for page_config in settings['pages']:
+        for key in ['url', 'patterns']:
+            if not key in page_config:
+                raise ConfigurationError("At least one of the page configs is missing '{}' key".format(key))
+
+        if not isinstance(page_config['url'], str):
+            raise configurationerror("'url' must be a string (got {} of type {})".format(page_config['url'], type(page_config['url'])))
+
+        if not isinstance(page_config['patterns'], (list, tuple)):
+            raise ConfigurationError("'patterns' must be a collection (got {} of type {})".format(page_config['patterns'], type(page_config['patterns'])))
+
+        for pattern in page_config['patterns']:
+            if not isinstance(pattern, str):
+                raise ConfigurationError("'patterns' must be a string (got {} of type {})".format(pattern, type(pattern)))
+
+        if len(page_config['patterns']) == 0:
+            warnings.append("No patterns specified for url {}.".format(page_config['url']))
+
+    settings['probe_interval'] = get_optional_integer_setting('probe-interval', DEFAULT_PROBE_INTERVAL, command_line_namespace, requirements)
+    if settings['probe_interval'] < 0:
+        raise ConfigurationError("'probe-interval' must be non-negative")
+
+    settings['port'] = get_optional_integer_setting('port', DEFAULT_PORT, command_line_namespace, requirements)
+    if not (0 < settings['port'] < 65535):
+        raise ConfigurationError("'port' must be in range 0..65535")
+
+    return (settings, warnings)
 
 if __name__ == '__main__':
     root_logger = logging.getLogger()
@@ -212,7 +253,16 @@ if __name__ == '__main__':
     configure_console_logging(logging.INFO)
     configure_file_logging(logging.DEBUG, 'http_watchdog.log')
 
-    settings = read_settings()
+    try:
+        (settings, warnings) = read_settings()
+    except ConfigurationError as exception:
+        logger.error("There are errors in the requirements file or command-line values:")
+        logger.error(str(exception))
+        sys.exit(1)
+
+    for warning in warnings:
+        logger.warning('WARNING: %s', warning)
+    logger.warning('')
 
     watchdog = HttpWatchdog(settings['probe_interval'], settings['pages'])
 
