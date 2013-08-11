@@ -27,10 +27,14 @@ class ReportPageGenerator:
 
         table_body = ""
         for (result, config) in zip(probe_results, page_configs):
+            assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR']
+            status = result['result'] if result != None else 'NOT PROBED YET'
+            status_class = status.lower().replace(' ', '-')
+
             table_body += (
                 "<tr>\n"
                 "   <td><a href='http://{url}'>{url}</a></td>\n"
-                "   <td>{status}</td>\n"
+                "   <td class='{status_class}'>{status}</td>\n"
                 "   <td>{time:0.0f} ms</td>\n"
                 "</tr>\n"
             ).format(
