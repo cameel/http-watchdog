@@ -50,3 +50,7 @@ pages:
     patterns:
       - Borðoy
       - Færøerne
+  - url: http://sv.wikipedia.org/wiki/Eid_al-fitr#Sverige
+    # URL with fragment
+    patterns:
+      - Sverige
