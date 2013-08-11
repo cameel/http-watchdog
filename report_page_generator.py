@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 
+from probe_result import ProbeResult
+
 class ReportPageGenerator:
     REPORT_DIR        = 'report-templates'
     BOOTSTRAP_VERSION = '2.3.2'
@@ -30,9 +32,9 @@ class ReportPageGenerator:
         table_body = ""
         for (result, config) in zip(probe_results, page_configs):
             if result != None:
-                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR', 'CONNECTION ERROR']
+                assert result['result'] in [ProbeResult.MATCH, ProbeResult.NO_MATCH, ProbeResult.HTTP_ERROR, ProbeResult.CONNECTION_ERROR]
 
-                status              = result['result']
+                status              = ProbeResult.to_str(result['result'])
                 http_status         = (str(result['http_status']) if result['http_status'] != None else '') + ' ' + result['reason']
                 request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000)
                 seconds_since_probe = '{} seconds ago'.format(round((datetime.utcnow() - result['last_probed_at']).total_seconds()))

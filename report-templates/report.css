@@ -1,3 +1,5 @@
+/* SYNC: Keep class names in sync with ProbeResult.to_str() */
+
 td.match {
     color:            black;
     background-color: lime;

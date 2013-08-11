@@ -12,6 +12,7 @@ from queue        import Queue
 from urllib.parse import urlparse, quote as urllib_quote
 
 from report_server import ReportServer
+from probe_result  import ProbeResult
 
 DEFAULT_PROBE_INTERVAL = 10
 DEFAULT_PORT           = 80
@@ -126,7 +127,7 @@ class HttpWatchdog:
                     # late than let the program crash here if the network goes down for a while.
                     logger.exception("A GET request has been interrupted by an exception")
 
-                    result      = 'CONNECTION ERROR'
+                    result      = ProbeResult.CONNECTION_ERROR
                     reason      = str(exception)
                     http_status = None
 
@@ -152,9 +153,9 @@ class HttpWatchdog:
                             else:
                                 logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
 
-                        result = 'MATCH' if pattern_found else 'NO MATCH'
+                        result = ProbeResult.MATCH if pattern_found else ProbeResult.NO_MATCH
                     else:
-                        result = 'HTTP ERROR'
+                        result = ProbeResult.HTTP_ERROR
 
                     reason      = response.reason
                     http_status = response.status
@@ -193,11 +194,15 @@ class HttpWatchdog:
 
                 self.probe_results[i] = result
 
-                assert result['result'] in ['MATCH', 'NO MATCH', 'HTTP ERROR', 'CONNECTION ERROR']
+                assert result['result'] in [ProbeResult.MATCH, ProbeResult.NO_MATCH, ProbeResult.HTTP_ERROR, ProbeResult.CONNECTION_ERROR]
 
                 # By default inform only about the failures
-                level = logging.INFO if result['result'] != 'MATCH' else logging.DEBUG
-                status_string = "{result} {http_status} {reason}".format(**result)
+                level = logging.INFO if result['result'] != ProbeResult.MATCH else logging.DEBUG
+                status_string = "{} {} {}".format(
+                    ProbeResult.to_str(result['result']),
+                    result['http_status'],
+                    result['reason']
+                )
 
                 logger.log(level, "%s: %s (%0.0f ms)", self.page_configs[i]['url'], status_string, result['request_duration'] * 1000)
 
