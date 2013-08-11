@@ -49,7 +49,6 @@ class HttpWatchdog:
     def _extract_info_from_url(cls, parsed_url):
         assert parsed_url.scheme in cls.DEFAULT_PORTS.keys()
 
-        # FIXME: Don't discard username and password
         if not ':' in parsed_url.netloc:
             host = parsed_url.netloc
             port = ''
@@ -285,7 +284,10 @@ def read_settings():
 
         parsed_url = urlparse(page_config['url'])
         if not parsed_url.scheme in ['http', 'https']:
-            raise configurationerror("Unsupported protocol: '{}'".format(parsed_url.scheme))
+            raise ConfigurationError("Unsupported protocol: '{}'".format(parsed_url.scheme))
+
+        if parsed_url.username != None or parsed_url.password != None:
+            raise ConfigurationError("URL contains username and/or password. This program does not support HTTP authentication. URL in question: '{}'".format(page_config['url']))
 
         if not isinstance(page_config['patterns'], (list, tuple)):
             raise ConfigurationError("'patterns' must be a collection (got {} of type {})".format(page_config['patterns'], type(page_config['patterns'])))
