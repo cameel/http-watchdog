@@ -54,3 +54,15 @@ pages:
     # URL with fragment
     patterns:
       - Sverige
+  - url: https://sv.wikipedia.org/w/index.php?title=Eid_al-fitr&action=edit
+    # URL with query
+    patterns:
+      - Sverige
+  - url: http://➡.ws/♥
+    # URL with IDN
+    patterns:
+      - link
+  - url: http://例子.测试/首页
+    # URL with IDN (without redirect)
+    patterns:
+      - 首页

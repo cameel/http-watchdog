@@ -61,9 +61,12 @@ class HttpWatchdog:
         path           = parsed_url.path if parsed_url.path != '' else '/'
         path_and_query = path + ('?' + parsed_url.query if parsed_url.query != '' else '')
 
-        escaped_path_and_query = urllib_quote(path_and_query)
+        # TODO: Omitting '=&?/' seems enough for most cases but it's probably not a complete set of special.
+        # characters. This can be made more robust.
+        escaped_host           = host.encode('idna').decode('ascii')
+        escaped_path_and_query = urllib_quote(path_and_query, '=&?/')
 
-        return (host, port, escaped_path_and_query)
+        return (escaped_host, port, escaped_path_and_query)
 
     @classmethod
     def _detect_response_charset(cls, content_type):
