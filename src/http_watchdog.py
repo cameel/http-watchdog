@@ -85,66 +85,77 @@ class HttpWatchdog:
 
         return result
 
+    @classmethod
+    def _fetch_page(cls, url):
+        parsed_url = urlparse(url)
+        assert parsed_url.scheme in ['http', 'https'], 'Unsupported protocols should not pass through validation performed earlier'
+
+        (host, port, path_and_query) = cls._dissect_and_escape_url(parsed_url)
+        connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
+
+        result       = None
+        page_content = None
+        start_time   = None
+        end_time     = None
+        http_status  = None
+        reason       = None
+        try:
+            connection = connection_class(host, port, timeout = cls.CONNECTION_TIMEOUT)
+            logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
+
+            # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
+            # NOTE: getresponse() probably performs the whole operation of receiving the data from
+            # the server rather than just passing the data already received by the OS and for that
+            # reason it's also included in timing.
+            start_time = time.time()
+
+            try:
+                connection.request("GET", path_and_query)
+                response = connection.getresponse()
+            finally:
+                end_time = time.time()
+
+            reason      = response.reason
+            http_status = response.status
+
+            if response.status == http.client.OK:
+                # TODO: Add safeguards to make sure the program behaves sensibly with any input, not just text documents.
+                # For example large binary files may waste a lot of bandwidth and processing power before it becomes apparent
+                # that something's wrong.
+                content_type     = response.getheader('Content-Type')
+                response_charset = cls._detect_response_charset(content_type)
+                logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
+
+                page_content = response.read().decode(response_charset or 'utf-8')
+
+            connection.close()
+
+        except (AssertionError, TypeError, SyntaxError, ValueError):
+            # We're only interested in connection-related failures. There's no easy and future-proof way to
+            # discern them from exceptions caused by programmer's mistakes but we can at least make our life
+            # easier by excluding some common ones.
+            raise
+        except Exception as exception:
+            # All other non-base exceptions should be caught and presented to the user. They're silenced but still
+            # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
+            # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
+            # late than let the program crash here if the network goes down for a while.
+            logger.debug("A GET request has been interrupted by an exception", exc_info = True)
+
+            result      = ProbeResult.CONNECTION_ERROR
+            reason      = str(exception)
+            http_status = None
+
+        return (page_content, result, http_status, reason, start_time, end_time)
+
     def probe(self):
         for page_config in self._page_configs:
             logger.debug("Probing %s", page_config['url'])
 
-            parsed_url = urlparse(page_config['url'])
-            assert parsed_url.scheme in ['http', 'https'], 'Unsupported protocols should not pass through validation performed earlier'
-
-            (host, port, path_and_query) = self._dissect_and_escape_url(parsed_url)
-            connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
-
-            result       = None
-            page_content = None
-            start_time   = None
-            end_time     = None
-            try:
-                connection = connection_class(host, port, timeout = self.CONNECTION_TIMEOUT)
-                logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
-
-                # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
-                # NOTE: getresponse() probably performs the whole operation of receiving the data from
-                # the server rather than just passing the data already received by the OS and for that
-                # reason it's also included in timing.
-                start_time = time.time()
-
-                try:
-                    connection.request("GET", path_and_query)
-                    response = connection.getresponse()
-                finally:
-                    end_time = time.time()
-
-                if response.status == http.client.OK:
-                    # TODO: Add safeguards to make sure the program behaves sensibly with any input, not just text documents.
-                    # For example large binary files may waste a lot of bandwidth and processing power before it becomes apparent
-                    # that something's wrong.
-                    content_type     = response.getheader('Content-Type')
-                    response_charset = self._detect_response_charset(content_type)
-                    logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
-
-                    page_content = response.read().decode(response_charset or 'utf-8')
-
-                connection.close()
-
-            except (AssertionError, TypeError, SyntaxError, ValueError):
-                # We're only interested in connection-related failures. There's no easy and future-proof way to
-                # discern them from exceptions caused by programmer's mistakes but we can at least make our life
-                # easier by excluding some common ones.
-                raise
-            except Exception as exception:
-                # All other non-base exceptions should be caught and presented to the user. They're silenced but still
-                # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
-                # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
-                # late than let the program crash here if the network goes down for a while.
-                logger.debug("A GET request has been interrupted by an exception", exc_info = True)
-
-                result      = ProbeResult.CONNECTION_ERROR
-                reason      = str(exception)
-                http_status = None
+            (page_content, result, http_status, reason, start_time, end_time) = self._fetch_page(page_config['url'])
 
             if result == None:
-                if response.status == http.client.OK:
+                if http_status == http.client.OK:
                     assert page_content != None
 
                     pattern_found = True
@@ -161,9 +172,6 @@ class HttpWatchdog:
                     result = ProbeResult.MATCH if pattern_found else ProbeResult.NO_MATCH
                 else:
                     result = ProbeResult.HTTP_ERROR
-
-                reason      = response.reason
-                http_status = response.status
 
             assert start_time == None and end_time == None or end_time >= start_time
             yield {
