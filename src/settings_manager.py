@@ -1,3 +1,5 @@
+""" Definition of SettingsManager class """
+
 import logging
 import yaml
 from argparse     import ArgumentParser
@@ -11,13 +13,27 @@ logger = logging.getLogger(__name__)
 class ConfigurationError(Exception): pass
 
 class SettingsManager:
+    """ A class that gathers settings from requirement file, command line and defaults,
+        decides which ones have priority, validates them and stores for later access.
+    """
+
     def __init__(self):
+        """ Creates a manager with an empty set of settings """
+
         self._settings = {}
 
     def get(self, setting_name):
+        """ Returns specified setting """
+        assert setting_name in self._settings
+
         return self._settings[setting_name]
 
     def gather(self):
+        """ Reads command line parameters, based on that finds the requirement file,
+            reads it and performs validation. When it's done the manager contains a
+            set of settings ready to be used.
+        """
+
         command_line_namespace = self._parse_command_line()
 
         (self._settings, warnings) = self._read_and_validate(command_line_namespace)
@@ -27,6 +43,11 @@ class SettingsManager:
 
     @classmethod
     def _parse_command_line(cls):
+        """ Parses the values passed by the user on the command line according to a set
+            of internal rules. Returns a namespace object that contains all required and possibly
+            some optional settings.
+        """
+
         parser = ArgumentParser(description = "A tool for monitoring remote documents available over HTTP.")
         parser.add_argument('requirement_file_path',
             help    = "The file that lists the URL to be monitored and their requirements",
@@ -50,6 +71,11 @@ class SettingsManager:
 
     @classmethod
     def _get_optional_integer_setting(cls, setting_name, default_value, command_line_namespace, requirements):
+        """ Tries to find specified setting in requirement file and on the command line.
+            If neither is available, uses specified default. If both are available, the value
+            from command line has higher priority.
+        """
+
         internal_setting_name = setting_name.replace('-', '_')
 
         command_line_value = getattr(command_line_namespace, internal_setting_name)
@@ -66,6 +92,11 @@ class SettingsManager:
 
     @classmethod
     def _read_and_validate(cls, command_line_namespace):
+        """ Reads requirements from the file specified on the command line and
+            validates its contents. Returns a dict with processed settings, ready
+            to be used.
+        """
+
         with open(command_line_namespace.requirement_file_path) as requirement_file:
             requirements = yaml.load(requirement_file)
 

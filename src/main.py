@@ -1,3 +1,5 @@
+""" Main block of code. Creates all necessary object instances and puts things in motion. """
+
 import sys
 import errno
 import logging
@@ -10,6 +12,7 @@ from .settings_manager import SettingsManager, ConfigurationError
 logger = logging.getLogger(__name__)
 
 def configure_console_logging(logger, level):
+    """ Makes specified logger print information to the console """
     formatter = logging.Formatter('%(message)s')
 
     handler = logging.StreamHandler()
@@ -19,6 +22,10 @@ def configure_console_logging(logger, level):
     logger.addHandler(handler)
 
 def configure_file_logging(logger, level, log_path):
+    """ Makes specified logger print information to specified file.
+        The file will be appended to if it already exists.
+    """
+
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     handler = logging.FileHandler(log_path)
@@ -28,6 +35,8 @@ def configure_file_logging(logger, level, log_path):
     logger.addHandler(handler)
 
 def configure_logging():
+    """ Configures the top-level logger """
+
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
 
@@ -35,6 +44,8 @@ def configure_logging():
     configure_file_logging(root_logger, logging.DEBUG, 'http_watchdog.log')
 
 def gather_settings():
+    """ Creates SettingsManager and orders it to gather setting values from requirement file, command line and defaults """
+
     try:
         settings_manager = SettingsManager()
         settings_manager.gather()
@@ -47,9 +58,13 @@ def gather_settings():
     return settings_manager
 
 def create_watchdog(settings_manager):
+    """ Creates an instance of the watchdog """
+
     return HttpWatchdog(settings_manager.get('probe_interval'), settings_manager.get('pages'))
 
 def start_report_server(settings_manager, watchdog):
+    """ Starts a HTTP server that serves a page describing latest probing results """
+
     exception_queue = Queue()
     report_server = ReportServer(settings_manager.get('port'), watchdog, exception_queue)
     report_server.start()
@@ -57,6 +72,8 @@ def start_report_server(settings_manager, watchdog):
     return (report_server, exception_queue)
 
 def run_watchdog(settings_manager, watchdog, exception_queue):
+    """ Starts an infinite loop executing watchdog probes """
+
     try:
         watchdog.run_forever(exception_queue)
     except OSError as exception:
@@ -72,6 +89,8 @@ def run_watchdog(settings_manager, watchdog, exception_queue):
         sys.exit(0)
 
 def main():
+    """ Runs the application """
+
     configure_logging()
 
     settings_manager                 = gather_settings()

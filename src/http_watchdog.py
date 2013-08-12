@@ -1,3 +1,7 @@
+""" Definition of HttpWatchdog class that provides facilities for downloading web pages
+    over HTTP and checking them for pattern matches.
+"""
+
 import sys
 import errno
 import re
@@ -14,6 +18,15 @@ logger = logging.getLogger(__name__)
 class CharsetDetectionError(Exception): pass
 
 class HttpWatchdog:
+    """ This ciass is a simple HTTP client that runs in infinite loop (run_forever()) which
+        periodically checks a set of web pages for HTTP errors and lack of pattern matches.
+
+        The class makes extensive use of logging to provide both information interesting for
+        the end user (INFO level) and additional information useful for diagnosing problems
+        (DEBUG level). Since the purpose is to alter the administrator when a site goes down,
+        only problems are reported on the INFO level.
+    """
+
     CONNECTION_TIMEOUT = 30
     DEFAULT_PORTS      = {
         'http':  80,
@@ -21,6 +34,13 @@ class HttpWatchdog:
     }
 
     def __init__(self, probe_interval, page_configs):
+        """ Creates a watchdog instance running specified configuration.
+
+            page_configs is a list of dicts. Each dict represents one page to be probed.
+            It should contain 'url' - full URL of the page and 'patterns' - a list of
+            strings that will be interpreted as regular expression patterns.
+        """
+
         self._probe_interval = probe_interval
         self._page_configs   = []
 
@@ -40,6 +60,11 @@ class HttpWatchdog:
 
     @classmethod
     def _dissect_and_escape_url(cls, parsed_url):
+        """ Splits a full URL into parts that can be used directly by the client to
+            establish a connection and fetch the page. IDNs are converted to punycode
+            and non-ASCII characters in the path and query are url-encoded.
+        """
+
         assert parsed_url.scheme in cls.DEFAULT_PORTS.keys()
 
         if not ':' in parsed_url.netloc:
@@ -63,6 +88,8 @@ class HttpWatchdog:
 
     @classmethod
     def _detect_response_charset(self, content_type):
+        """ Extracts encoding information from a Content-Type HTTP header """
+
         if content_type == None:
             return None
 
@@ -87,6 +114,20 @@ class HttpWatchdog:
 
     @classmethod
     def _fetch_page(cls, url):
+        """ Attempts to fetch the content of specified web page. Returns a tuple containing the content
+            and some additional information about eventual errors and timing.
+
+            The tuple contains:
+                - page content: the page content convert to a unicode string if the connection was successfully
+                  estabilished and request returned 200 OK. None otherwise.
+                - result - a value from ProbeResult enum
+                - http_status - the returned HTTP status if the request was performed (i.e. there were no connection errors).
+                  None otherwise.
+                - reason - A textual description of 'result'. If http_status is not None this is the HTTP reason.
+                - start_time - Request start time if the request was performed or None.
+                - end_time - Request end time if the request was performed or None.
+        """
+
         parsed_url = urlparse(url)
         assert parsed_url.scheme in ['http', 'https'], 'Unsupported protocols should not pass through validation performed earlier'
 
@@ -149,6 +190,11 @@ class HttpWatchdog:
         return (page_content, result, http_status, reason, start_time, end_time)
 
     def probe(self):
+        """ Iterates over all page_configs and for each one tries to fetch the page and find specified patterns.
+            Only if there are no errors and all of the patterns are present, the result is ProbeResult.MATCH.
+            Yields dicts describing the result (same format as in on the list returned from probe_results()).
+        """
+
         for page_config in self._page_configs:
             logger.debug("Probing %s", page_config['url'])
 
@@ -206,6 +252,10 @@ class HttpWatchdog:
         return self._page_configs
 
     def _process_asynchronous_exceptions(self, exception_queue):
+        """ Checks specified queue for messages containing exception information from other threads.
+            If there is anything in the queue, raises it.
+        """
+
         logger.debug("Processing exceptions from other threads ({} messages)".format(exception_queue.qsize()))
 
         if not exception_queue.empty():
@@ -213,6 +263,14 @@ class HttpWatchdog:
             raise exc_type.with_traceback(exc_obj, exc_trace)
 
     def run_forever(self, exception_queue):
+        """ Iterates probe() in a loop over and over again, sleeping between each cycle.
+            Before each probe and after each cycle checks specified queue for exceptions raised by
+            other threads and reraises them if there are any.
+
+            The function never returns. It is expected to be interrupted by a KeyboardInterrupt either
+            from its own thread or from the ones communication through exception_queue.
+        """
+
         logger.info("Starting HTTP watchdog in an infinite loop. Use Ctrl+C to stop.\n")
 
         probe_index = 0
