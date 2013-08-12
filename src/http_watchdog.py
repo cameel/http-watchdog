@@ -205,7 +205,7 @@ class HttpWatchdog:
 
         return self._page_configs
 
-    def process_asynchronous_exceptions(self, exception_queue):
+    def _process_asynchronous_exceptions(self, exception_queue):
         logger.debug("Processing exceptions from other threads ({} messages)".format(exception_queue.qsize()))
 
         while not exception_queue.empty():
@@ -221,7 +221,7 @@ class HttpWatchdog:
 
             total_http_time = 0
             for (i, result) in enumerate(self.probe()):
-                self.process_asynchronous_exceptions(exception_queue)
+                self._process_asynchronous_exceptions(exception_queue)
 
                 self._probe_results[i] = result
 
@@ -242,7 +242,7 @@ class HttpWatchdog:
 
             logger.debug("Probe %d finished. Total HTTP time: %0.3f s", probe_index + 1, total_http_time)
 
-            self.process_asynchronous_exceptions(exception_queue)
+            self._process_asynchronous_exceptions(exception_queue)
 
             probe_index += 1
 
