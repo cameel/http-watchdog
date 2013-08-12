@@ -3,9 +3,9 @@ import errno
 import logging
 from queue import Queue
 
-from report_server    import ReportServer
-from http_watchdog    import HttpWatchdog
-from settings_manager import SettingsManager, ConfigurationError
+from .report_server    import ReportServer
+from .http_watchdog    import HttpWatchdog
+from .settings_manager import SettingsManager, ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,3 @@ def main():
     (report_server, exception_queue) = start_report_server(settings_manager, watchdog)
 
     run_watchdog(settings_manager, watchdog, exception_queue)
-
-if __name__ == '__main__':
-    main()

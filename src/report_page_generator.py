@@ -1,10 +1,10 @@
 import os
 from datetime import datetime
 
-from probe_result import ProbeResult
+from .probe_result import ProbeResult
 
 class ReportPageGenerator:
-    REPORT_DIR        = 'report-templates'
+    REPORT_DIR        = 'src/report-templates'
     BOOTSTRAP_VERSION = '2.3.2'
 
     @classmethod

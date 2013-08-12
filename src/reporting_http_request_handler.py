@@ -1,7 +1,7 @@
 import http.client
 from http.server import BaseHTTPRequestHandler
 
-from report_page_generator import ReportPageGenerator
+from .report_page_generator import ReportPageGenerator
 
 class ReportingHTTPRequestHandler(BaseHTTPRequestHandler):
     REPORT_PAGE_PATH = '/'
