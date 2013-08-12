@@ -181,11 +181,24 @@ class HttpWatchdog:
 
     @property
     def probe_results(self):
+        """ A list whose i-th element contains the result of probing i-th page from page_configs.
+            The list should not be modified from the outside of the class.
+
+            The watchdog never modifies the results after creating them. Every time the results are
+            updated, a reference to the record is replaced with a new one that points to complete new
+            record. This allows the list to be safely read asynchronously from a different thread.
+        """
 
         return self._probe_results
 
     @property
     def page_configs(self):
+        """ A list of configurations for the pages to be probed, obtained from the requirement file.
+            The list should not be modified from the outside of the class.
+
+            The list is never modified after watchdog construction and therefore can by safely
+            read asynchronously from a different thread.
+        """
 
         return self._page_configs
 
