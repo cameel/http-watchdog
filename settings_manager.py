@@ -18,7 +18,9 @@ class SettingsManager:
         return self._settings[setting_name]
 
     def gather(self):
-        (self._settings, warnings) = self._read_and_validate()
+        command_line_namespace = self._parse_command_line()
+
+        (self._settings, warnings) = self._read_and_validate(command_line_namespace)
 
         for warning in warnings:
             logger.warning('WARNING: %s', warning)
@@ -63,9 +65,7 @@ class SettingsManager:
             raise ConfigurationError("'{}' must be a an integer".format(setting_name)) from exception
 
     @classmethod
-    def _read_and_validate(cls):
-        command_line_namespace = cls._parse_command_line()
-
+    def _read_and_validate(cls, command_line_namespace):
         with open(command_line_namespace.requirement_file_path) as requirement_file:
             requirements = yaml.load(requirement_file)
 
