@@ -13,7 +13,7 @@ from urllib.parse import urlparse, quote as urllib_quote
 from report_server import ReportServer
 from probe_result  import ProbeResult
 
-DEFAULT_PROBE_INTERVAL = 10
+DEFAULT_PROBE_INTERVAL = 5 * 60
 DEFAULT_PORT           = 80
 
 logger = logging.getLogger(__name__)
