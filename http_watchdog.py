@@ -74,7 +74,8 @@ class HttpWatchdog:
         if content_type == None:
             return None
 
-        # FIXME: Are escaped semicolons or equals signs possible here?
+        # TODO: Are escaped semicolons or equals signs possible here?
+        # It seems to work in normal cirsumstances but should be made more robust.
         fields = content_type.split(';')
         result = None
         for field in fields:
@@ -123,7 +124,9 @@ class HttpWatchdog:
                     end_time = time.time()
 
                 if response.status == http.client.OK:
-                    # FIXME: What if the content is a binary file?
+                    # TODO: Add safeguards to make sure the program behaves sensibly with any input, not just text documents.
+                    # For example large binary files may waste a lot of bandwidth and processing power before it becomes apparent
+                    # that something's wrong.
                     content_type     = response.getheader('Content-Type')
                     response_charset = self._detect_response_charset(content_type)
                     logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)

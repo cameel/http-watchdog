@@ -5,7 +5,8 @@ from socketserver import TCPServer
 
 from reporting_http_request_handler import ReportingHTTPRequestHandler
 
-# FIXME: Thread-safe logging
+# NOTE: According to the docs the logging module is thread-safe:
+# http://docs.python.org/3.3/library/logging.html#thread-safety
 logger = logging.getLogger(__name__)
 
 class ReportServer:
