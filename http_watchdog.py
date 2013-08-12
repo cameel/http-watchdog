@@ -22,7 +22,8 @@ class ConfigurationError(Exception):    pass
 class CharsetDetectionError(Exception): pass
 
 class HttpWatchdog:
-    DEFAULT_PORTS = {
+    CONNECTION_TIMEOUT = 30
+    DEFAULT_PORTS      = {
         'http':  80,
         'https': 443,
     }
@@ -106,7 +107,7 @@ class HttpWatchdog:
             start_time   = None
             end_time     = None
             try:
-                connection = connection_class(host, port)
+                connection = connection_class(host, port, timeout = self.CONNECTION_TIMEOUT)
                 logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
 
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
