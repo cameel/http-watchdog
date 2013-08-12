@@ -29,20 +29,20 @@ class HttpWatchdog:
     }
 
     def __init__(self, probe_interval, page_configs):
-        self.probe_interval = probe_interval
-        self.page_configs   = []
+        self._probe_interval = probe_interval
+        self._page_configs   = []
 
-        logger.debug("Probing interval: %d seconds", self.probe_interval)
+        logger.debug("Probing interval: %d seconds", self._probe_interval)
 
         for page_config in page_configs:
-            self.page_configs.append({
+            self._page_configs.append({
                 'url':     page_config['url'],
                 'regexes': [re.compile(pattern) for pattern in page_config['patterns']]
             })
             logger.debug("Probe URL: %s", page_config['url'])
             logger.debug("Probe patterns: %s", ' AND '.join(page_config['patterns']))
 
-        self.probe_results = [None] * len(self.page_configs)
+        self._probe_results = [None] * len(self._page_configs)
 
         logger.debug("Watchdog initialized\n")
 
@@ -93,7 +93,7 @@ class HttpWatchdog:
         return None
 
     def probe(self):
-        for page_config in self.page_configs:
+        for page_config in self._page_configs:
             logger.debug("Probing %s", page_config['url'])
 
             parsed_url = urlparse(page_config['url'])
@@ -179,11 +179,15 @@ class HttpWatchdog:
                 'request_duration': end_time - start_time if end_time != None else None
             }
 
-    def get_probe_results(self):
-        return self.probe_results
+    @property
+    def probe_results(self):
 
-    def get_page_configs(self):
-        return self.page_configs
+        return self._probe_results
+
+    @property
+    def page_configs(self):
+
+        return self._page_configs
 
     def process_asynchronous_exceptions(self, exception_queue):
         logger.debug("Processing exceptions from other threads ({} messages)".format(exception_queue.qsize()))
@@ -203,7 +207,7 @@ class HttpWatchdog:
             for (i, result) in enumerate(self.probe()):
                 self.process_asynchronous_exceptions(exception_queue)
 
-                self.probe_results[i] = result
+                self._probe_results[i] = result
 
                 assert result['result'] in [ProbeResult.MATCH, ProbeResult.NO_MATCH, ProbeResult.HTTP_ERROR, ProbeResult.CONNECTION_ERROR]
 
@@ -216,7 +220,7 @@ class HttpWatchdog:
                 )
 
                 duration = " ({:0.0f} ms)".format(result['request_duration'] * 1000) if result['request_duration'] != None else ''
-                logger.log(level, "%s: %s%s", self.page_configs[i]['url'], status_string, duration)
+                logger.log(level, "%s: %s%s", self._page_configs[i]['url'], status_string, duration)
 
                 total_http_time += result['request_duration'] if result['request_duration'] != None else 0
 
@@ -226,8 +230,8 @@ class HttpWatchdog:
 
             probe_index += 1
 
-            logger.debug("Going to sleep for %d seconds\n", self.probe_interval)
-            time.sleep(self.probe_interval)
+            logger.debug("Going to sleep for %d seconds\n", self._probe_interval)
+            time.sleep(self._probe_interval)
 
 def configure_console_logging(level):
     root_logger = logging.getLogger()

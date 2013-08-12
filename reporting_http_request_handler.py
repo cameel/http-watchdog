@@ -20,8 +20,8 @@ class ReportingHTTPRequestHandler(BaseHTTPRequestHandler):
         self.do_HEAD()
 
         if self.path == self.REPORT_PAGE_PATH:
-            probe_results = self.server.probe_data_provider.get_probe_results()
-            page_configs  = self.server.probe_data_provider.get_page_configs()
+            probe_results = self.server.probe_data_provider.probe_results
+            page_configs  = self.server.probe_data_provider.page_configs
 
             page_content = ReportPageGenerator.generate_report(probe_results, page_configs)
         else:
