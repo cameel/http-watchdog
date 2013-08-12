@@ -1,0 +1,69 @@
+= HTTP watchdog
+A simple program that monitors web pages and reports their availability. This tool is intended as a monitoring tool for web site administrators for detecting problems on their sites.
+
+== Features
+* Reads a list of web pages (HTTP or HTTPS URLs) and corresponding page content requirements from a YAML file.
+  * Supports UTF-8 for both URLs and page content
+* Periodically makes an HTTP request to each page.
+* Verifies that the page content received from the server matches the content requirements.
+* Measures the time it took for the web server to complete the whole request.
+* Writes a log file that shows the progress of the periodic checks.
+* Prints errors and failed matches to the console (note: positive matches go only to the log file)
+* Runs a HTTP server in the same process that shows a report with links to monitored pages and their statuses.
+
+== Content requirements
+Currently the requirements are simply regular expressions. For each page you can specify multiple patterns and the watchdog will detect a match only if all of them are found.
+
+See `examples/pages.yaml` for a sample configuration file. Note that you may have to wrap some more complex patterns in quotes and/or use escaping to have them processed correctly.
+
+== Dependencies
+The program requires Python 3. Python package dependencies are specified in the `requirements.txt` file. Currently it's just `pyyaml`.
+
+It has been tested only under Linux (Arch Linux to be specific) but it's possible that it will work just fine under other operating systems, possibly with small modifications.
+
+== Installation
+The program does not require any special installation steps besides installing the dependencies. You can do it with `pip`:
+ pip install -r requirements.txt
+
+== Usage
+It's a console application and takes just a few arguments:
+ python http_watchdog.py <requirement_file.yaml> [--probe-interval N] [--port Y]
+
+* `requirement_file.yaml` is a mandatory path to a file listing URLs and their requirements. See `examples/pages.yaml` for a sample configuration file.
+* `probe-interval` is the time the program sleeps between subsequent probing cycles. Each page is probed once in each cycle (unless it occurs in the requirement file more than once).
+* `port` is the port to bind the report server to. Binding the server to the default port 80 may require administrator privileges so you may want to try a higher number, e.g. 8000.
+
+== Implementation notes
+The program runs two threads. One of them is responsible for probing and the other for serving the HTML report. They both log to `http_watchdog.log` file (though the probing thread logs significantly more). The probing thread is the main one and the server is considered a daemon and gets killed if the probing thread exits.
+
+There is a bit of glue code in `src/main.py` that creates and connects the objects and then starts the probing loop. The probing functionality is located mostly in `HttpWatchdog` class. The HTTP server consists of `ReportServer`, `ReportingHttpRequestHandler` and `ReportPageGenerator`. The files in `src/report-templates` directory are HTML and CSS templates used by `ReportPageGenerator` for constructing the report and error pages.
+
+== Testing
+There are some unit tests you can run with:
+ python -m unittest
+from the top-level directory.
+
+The test set is not comprehensive though because of both time constraints and the the specifics of the application. As it deals mostly with live servers and threads, automatic testing would require an extensive set of mock objects. Moreover unit tests are geared more towards verifying that the code still works after modifications given that it worked before rather than actually testing it. The program has been mostly tested "manually" instead. The few unit tests which are present are for the parts of code with clearly defined input and output and are meant to showcase how such tests would look like.
+
+== Missing features
+There is a significant number of small features or improvements that should find its way into the application but were omitted due to the time constraints:
+
+* <b>Following redirects</b>: currently redirects are reported as errors (actually anything but `200 OK` is considered an error which may be a problem in case of 2xx statuses)
+* <b>Multiple probing threads</b>: currently all URLs are checked sequentially by the same thread. There is a timeout on each connection (30 seconds) but it's still long enough to bog the application down in case of a slow server. Running probes in multiple threads would alleviate the problem to some extent.
+* <b>An option not to start the report server</b>: it's not always possible or desirable to have a very rudimentary and possibly insecure web server on the monitoring machine.
+* <b>An option to control the level of verbosity of both log file and console output</b>: currently the log is very verbose since it is meant to help find and diagnose problems. It's not always desirable though.
+* <b>Restarting server and/or probing thread if it crashes</b>.
+* <b>Ability to define more complex patterns</b>: maybe CSS or XPath selectors?
+* <b>Graceful handling of any HTTP content</b>: the current implementation will most likely have trouble processing large binary files; such content should be detected and reported instead of wasting resources on it.
+* <b>More robust handling of probing interval</b>: currently the probing thread sleeps always for the same length of time, no matter how long the probing took. Also, exceptions from the server thread are not processed during sleep (which may be a problem if the interval is long).
+* <b>An option that controls connection timeout length</b>.
+* <b>More robust data validation and sanitization</b>: the current implementation for example may have trouble escaping URLs containing some less common special characters. There are also certainly corner cases which have been overlooked.
+* <b>Support for HTTP authentication</b> (URLs that contain username and password)
+* <b>An option to force page encoding different than reported by the server</b>
+* <b>More user friendly error reporting and validation</b>: for example the number of the offending line from YAML file in every error message. Without it it may be hard to locate source of a problem in a large requirement file.
+* <b>Validation, sanitization and error reporting for report templates</b> (in case they get modified by the user)
+
+== License
+Copyright (c) Kamil Śliwak
+
+License: GPL version 3
