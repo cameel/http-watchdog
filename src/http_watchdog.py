@@ -208,7 +208,7 @@ class HttpWatchdog:
     def _process_asynchronous_exceptions(self, exception_queue):
         logger.debug("Processing exceptions from other threads ({} messages)".format(exception_queue.qsize()))
 
-        while not exception_queue.empty():
+        if not exception_queue.empty():
             (exc_type, exc_obj, exc_trace) = exception_queue.get_nowait()
             raise exc_type.with_traceback(exc_obj, exc_trace)
 
