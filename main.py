@@ -34,9 +34,7 @@ def configure_logging():
     configure_console_logging(root_logger, logging.INFO)
     configure_file_logging(root_logger, logging.DEBUG, 'http_watchdog.log')
 
-if __name__ == '__main__':
-    configure_logging()
-
+def gather_settings():
     try:
         settings_manager = SettingsManager()
         settings_manager.gather()
@@ -46,12 +44,19 @@ if __name__ == '__main__':
         logger.debug("", exc_info = True)
         sys.exit(1)
 
-    watchdog = HttpWatchdog(settings_manager.get('probe_interval'), settings_manager.get('pages'))
+    return settings_manager
 
+def create_watchdog(settings_manager):
+    return HttpWatchdog(settings_manager.get('probe_interval'), settings_manager.get('pages'))
+
+def start_report_server(settings_manager, watchdog):
     exception_queue = Queue()
     report_server = ReportServer(settings_manager.get('port'), watchdog, exception_queue)
     report_server.start()
 
+    return (report_server, exception_queue)
+
+def run_watchdog(settings_manager, watchdog, exception_queue):
     try:
         watchdog.run_forever(exception_queue)
     except OSError as exception:
@@ -66,3 +71,14 @@ if __name__ == '__main__':
         # this application.
         sys.exit(0)
 
+def main():
+    configure_logging()
+
+    settings_manager                 = gather_settings()
+    watchdog                         = create_watchdog(settings_manager)
+    (report_server, exception_queue) = start_report_server(settings_manager, watchdog)
+
+    run_watchdog(settings_manager, watchdog, exception_queue)
+
+if __name__ == '__main__':
+    main()
