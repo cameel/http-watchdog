@@ -125,7 +125,7 @@ class HttpWatchdog:
                     # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
                     # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
                     # late than let the program crash here if the network goes down for a while.
-                    logger.exception("A GET request has been interrupted by an exception")
+                    logger.debug("A GET request has been interrupted by an exception", exc_info = True)
 
                     result      = ProbeResult.CONNECTION_ERROR
                     reason      = str(exception)
@@ -349,13 +349,13 @@ if __name__ == '__main__':
     try:
         (settings, warnings) = read_settings()
     except ConfigurationError as exception:
-        logger.error("There are errors in the requirements file or command-line values:")
+        logger.error("There are errors in the requirement file or command-line values:")
         logger.error(str(exception))
+        logger.debug("", exc_info = True)
         sys.exit(1)
 
     for warning in warnings:
         logger.warning('WARNING: %s', warning)
-    logger.warning('')
 
     watchdog = HttpWatchdog(settings['probe_interval'], settings['pages'])
 
