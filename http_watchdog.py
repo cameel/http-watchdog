@@ -7,7 +7,6 @@ import logging
 import yaml
 from datetime     import datetime
 from argparse     import ArgumentParser
-from contextlib   import closing
 from queue        import Queue
 from urllib.parse import urlparse, quote as urllib_quote
 
@@ -102,7 +101,12 @@ class HttpWatchdog:
             (host, port, path_and_query) = self._dissect_and_escape_url(parsed_url)
             connection_class = http.client.HTTPConnection if parsed_url.scheme == 'http' else http.client.HTTPSConnection
 
-            with closing(connection_class(host, port)) as connection:
+            result       = None
+            page_content = None
+            start_time   = None
+            end_time     = None
+            try:
+                connection = connection_class(host, port)
                 logger.debug("GET %s://%s:%d%s", parsed_url.scheme, host, port, path_and_query)
 
                 # NOTE: We're interested in wall-time here, not CPU time, hence time() rather than clock()
@@ -111,61 +115,67 @@ class HttpWatchdog:
                 # reason it's also included in timing.
                 start_time = time.time()
 
-                result = None
                 try:
                     connection.request("GET", path_and_query)
                     response = connection.getresponse()
-                except (AssertionError, TypeError, SyntaxError, ValueError):
-                    # We're only interested in connection-related failures. There's no easy and future-proof way to
-                    # discern them from exceptions caused by programmer's mistakes but we can at least make our life
-                    # easier by excluding some common ones.
-                    raise
-                except Exception as exception:
-                    # All other non-base exceptions should be caught and presented to the user. They're silenced but still
-                    # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
-                    # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
-                    # late than let the program crash here if the network goes down for a while.
-                    logger.debug("A GET request has been interrupted by an exception", exc_info = True)
+                finally:
+                    end_time = time.time()
 
-                    result      = ProbeResult.CONNECTION_ERROR
-                    reason      = str(exception)
-                    http_status = None
+                if response.status == http.client.OK:
+                    # FIXME: What if the content is a binary file?
+                    content_type     = response.getheader('Content-Type')
+                    response_charset = self._detect_response_charset(content_type)
+                    logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
 
-                end_time = time.time()
+                    page_content = response.read().decode(response_charset or 'utf-8')
 
-                if result == None:
-                    if response.status == http.client.OK:
-                        # FIXME: What if the content is a binary file?
-                        content_type     = response.getheader('Content-Type')
-                        response_charset = self._detect_response_charset(content_type)
-                        logger.debug("Got response with 'Content-Type': '%s'; Detected charset: '%s'", content_type, response_charset)
+                connection.close()
 
-                        page_content = response.read().decode(response_charset or 'utf-8')
+            except (AssertionError, TypeError, SyntaxError, ValueError):
+                # We're only interested in connection-related failures. There's no easy and future-proof way to
+                # discern them from exceptions caused by programmer's mistakes but we can at least make our life
+                # easier by excluding some common ones.
+                raise
+            except Exception as exception:
+                # All other non-base exceptions should be caught and presented to the user. They're silenced but still
+                # get logged. This is a bit heavy-handed but things can go wrong at many different levels of the stack
+                # and it's hard to create a comprehensive list of possible exceptions. It's better to report an error
+                # late than let the program crash here if the network goes down for a while.
+                logger.debug("A GET request has been interrupted by an exception", exc_info = True)
 
-                        pattern_found = True
-                        for regex in page_config['regexes']:
-                            match = regex.search(page_content)
-                            pattern_found &= (match != None)
+                result      = ProbeResult.CONNECTION_ERROR
+                reason      = str(exception)
+                http_status = None
 
-                            if not pattern_found:
-                                logger.debug("Pattern '%s': no match", regex.pattern)
-                                break
-                            else:
-                                logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
+            if result == None:
+                if response.status == http.client.OK:
+                    assert page_content != None
 
-                        result = ProbeResult.MATCH if pattern_found else ProbeResult.NO_MATCH
-                    else:
-                        result = ProbeResult.HTTP_ERROR
+                    pattern_found = True
+                    for regex in page_config['regexes']:
+                        match = regex.search(page_content)
+                        pattern_found &= (match != None)
 
-                    reason      = response.reason
-                    http_status = response.status
+                        if not pattern_found:
+                            logger.debug("Pattern '%s': no match", regex.pattern)
+                            break
+                        else:
+                            logger.debug("Pattern '%s': match at %d = '%s'", regex.pattern, match.start(), match.group(0))
 
+                    result = ProbeResult.MATCH if pattern_found else ProbeResult.NO_MATCH
+                else:
+                    result = ProbeResult.HTTP_ERROR
+
+                reason      = response.reason
+                http_status = response.status
+
+            assert start_time == None and end_time == None or end_time >= start_time
             yield {
                 'result':           result,
                 'http_status':      http_status,
                 'reason':           reason,
                 'last_probed_at':   datetime.utcnow(),
-                'request_duration': end_time - start_time
+                'request_duration': end_time - start_time if end_time != None else None
             }
 
     def get_probe_results(self):
@@ -204,9 +214,10 @@ class HttpWatchdog:
                     result['reason']
                 )
 
-                logger.log(level, "%s: %s (%0.0f ms)", self.page_configs[i]['url'], status_string, result['request_duration'] * 1000)
+                duration = " ({:0.0f} ms)".format(result['request_duration'] * 1000) if result['request_duration'] != None else ''
+                logger.log(level, "%s: %s%s", self.page_configs[i]['url'], status_string, duration)
 
-                total_http_time += result['request_duration']
+                total_http_time += result['request_duration'] if result['request_duration'] != None else 0
 
             logger.debug("Probe %d finished. Total HTTP time: %0.3f s", probe_index + 1, total_http_time)
 

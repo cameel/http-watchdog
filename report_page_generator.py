@@ -36,7 +36,7 @@ class ReportPageGenerator:
 
                 status              = ProbeResult.to_str(result['result'])
                 http_status         = (str(result['http_status']) if result['http_status'] != None else '') + ' ' + result['reason']
-                request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000)
+                request_duration    = '{:0.0f} ms'.format(result['request_duration'] * 1000) if result['request_duration'] != None else ''
                 seconds_since_probe = '{} seconds ago'.format(round((datetime.utcnow() - result['last_probed_at']).total_seconds()))
                 last_probed_at      = str(result['last_probed_at']) + " UTC"
             else:
