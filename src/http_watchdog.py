@@ -81,9 +81,9 @@ class HttpWatchdog:
                     # TODO: Say which url this message pertains to
                     raise CharsetDetectionError("Found multiple charset fields in the Content-Type header: {}".format(content_type))
 
-                return tokens[1].strip()
+                result = tokens[1].strip()
 
-        return None
+        return result
 
     def probe(self):
         for page_config in self._page_configs:
