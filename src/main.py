@@ -76,6 +76,9 @@ def run_watchdog(settings_manager, watchdog, exception_queue):
 
     try:
         watchdog.run_forever(exception_queue)
+    except PermissionError as exception:
+        assert exception.errno in [errno.EACCES, errno.EPERM]
+        logger.error("ERROR: %s. Are you sure you have enough privileges to bind to port %d? You can use --port option to select a different port.", str(exception), settings_manager.get('port'))
     except OSError as exception:
         if exception.errno == errno.EADDRINUSE:
             logger.error("ERROR: Port %d is in use by a different server or is still in TIME_WAIT state after previous use. Please select a different one or wait a while.", settings_manager.get('port'))
